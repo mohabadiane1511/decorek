@@ -47,7 +47,7 @@ Six services, un seul `docker compose up`.
 | `db` | Base de données | `postgres:17-alpine` |
 | `cache` | Cache, sessions, limitation de débit | `redis:7-alpine` |
 | `storage` | Images produits (S3-compatible) | `minio/minio` |
-| `api` | API métier + authentification | Node 22 + Hono + Drizzle |
+| `api` | API métier + authentification | Node 22 + Hono + Prisma 7 |
 | `web` | Front TanStack Start en SSR | Node 22 (build Nitro) |
 | `proxy` | Entrée unique, TLS automatique | `caddy:2-alpine` |
 
@@ -94,14 +94,32 @@ scripts/     outillage (vérification d'infrastructure, sauvegardes)
 docs/        ce plan et la passation
 ```
 
-**Tout le code backend vit dans `backend/`**, y compris son `package.json`, ses migrations et
-ses tests. Le front n'importe jamais depuis `backend/` : le seul contrat entre les deux est
-`src/data/types.ts`, que le backend importe en lecture pour rester aligné.
+**Tout le code backend vit dans `backend/`**, y compris son `package.json`, son `schema.prisma`,
+ses migrations et ses tests. Le front n'importe jamais depuis `backend/`.
 
-**Pourquoi Hono + Drizzle** : tout reste en TypeScript, donc `src/data/types.ts` devient le
-contrat partagé entre l'API et le front, sans duplication ni génération de code. Drizzle produit
-des migrations SQL lisibles. Hono expose `app.request()`, qui permet de tester les endpoints sans
-lancer de serveur.
+**Pourquoi Hono** : tout reste en TypeScript, et `app.request()` permet de tester les endpoints
+sans lancer de serveur ni ouvrir de port.
+
+**Pourquoi Prisma 7** : `schema.prisma` devient la source de vérité, les migrations sont
+versionnées (`migrate dev` en local, `migrate deploy` en production), et Prisma Studio donne une
+vue directe sur les données pendant le développement. Surtout, depuis la version 7 le client
+**n'embarque plus de moteur Rust** : plus de binaire natif à faire correspondre à Alpine et à
+OpenSSL, ce qui était le piège classique de Prisma en conteneur. L'accès à Postgres passe par un
+adaptateur explicite, `@prisma/adapter-pg`.
+
+### Deux jeux de types, et c'est voulu
+
+Prisma **génère** ses propres types depuis le schéma. Ils ne remplacent pas `src/data/types.ts` :
+
+- **Types Prisma** — représentation de la base, internes au backend. Ils reflètent les écarts
+  assumés du §3 : images dans une table séparée, mouvements de stock, utilisations de promo.
+- **`src/data/types.ts`** — contrat de l'API, ce que le front reçoit. Un produit y garde
+  `images: string[]`, et les champs internes comme `internalNote` n'y apparaissent pas.
+
+Le backend convertit explicitement de l'un vers l'autre. Cette couche n'est pas une lourdeur
+administrative : le schéma diverge volontairement du modèle qu'affiche le front, et sans elle
+c'est la structure de la base qui dicterait l'interface — ou pire, des champs internes qui
+fuiteraient dans les réponses publiques.
 
 ---
 
@@ -138,7 +156,7 @@ l'extérieur**. À vérifier explicitement depuis une machine tierce.
 
 #### Lot 3 — Schéma · `feat/db-schema`
 
-Migrations Drizzle reprenant `src/data/types.ts`, avec quatre écarts délibérés :
+`backend/prisma/schema.prisma` reprenant `src/data/types.ts`, avec quatre écarts délibérés :
 
 | Table | Écart vs. la maquette | Raison |
 |---|---|---|
@@ -151,9 +169,15 @@ Les autres suivent la passation : `categories`, `products`, `orders`, `order_ite
 prix, du nom et de l'image), `delivery_regions`, `delivery_areas`, `site_content` (singleton),
 `users`, et `user_roles` **en table séparée**.
 
-*Tests* : migration appliquée sur une base vierge puis annulée, sans erreur ; contraintes
-d'unicité vérifiées (slug produit, numéro de commande, code promo).
-*Fin de lot* : `npm run db:migrate` construit le schéma complet depuis zéro.
+La séquence des numéros de commande n'ayant pas d'équivalent dans le langage de Prisma, elle est
+créée par une migration SQL écrite à la main — `prisma migrate` sait les intégrer.
+
+*Tests* : migration appliquée sur une base vierge sans erreur ; contraintes d'unicité vérifiées
+(slug produit, numéro de commande, code promo) ; `prisma migrate diff` ne détecte aucun écart
+entre le schéma et la base, ce qui garantit qu'aucune modification n'a été appliquée à la main
+sans migration correspondante.
+*Vérification* : `npx prisma studio` affiche toutes les tables, vides.
+*Fin de lot* : `npm run db:migrate` construit le schéma complet depuis une base vierge.
 
 #### Lot 4 — Données initiales · `feat/db-seed`
 
@@ -173,6 +197,10 @@ au moins une image dont l'URL répond en 200.
 
 Service Hono conteneurisé, **dans `backend/`** : configuration, `/api/health`, format d'erreur
 unifié, validation par `zod` (déjà une dépendance du projet), journalisation.
+
+Le client Prisma étant généré, `prisma generate` doit tourner à la construction de l'image, avant
+la compilation TypeScript — un `node_modules` copié depuis le poste ne suffit pas. Le contrôle de
+santé vérifie la connexion à Postgres, pas seulement que le processus répond.
 
 *Tests* : `/api/health` répond 200 ; une requête invalide renvoie une erreur au format attendu.
 *Fin de lot* : `docker compose up` démarre aussi l'API, joignable **uniquement** via le proxy.
@@ -272,8 +300,11 @@ avec `admin@decorek.sn` → accès. Puis essayer `adminfake@test.sn` → **doit 
 
 #### Lot 12 — Commandes côté serveur · `feat/api-commandes`
 
-Le cœur métier. Création **transactionnelle** : commande, mouvements de stock et utilisation du
-code promo dans une seule transaction. Numéro issu de la séquence. Montants **recalculés
+Le cœur métier. Création **transactionnelle** via `prisma.$transaction` en mode interactif :
+commande, mouvements de stock et utilisation du code promo dans une seule transaction. Le
+décrément de stock doit poser un verrou sur les lignes concernées (`SELECT … FOR UPDATE`, via
+`$queryRaw` si nécessaire) — sans lui, deux commandes simultanées sur le dernier article passent
+toutes les deux. Numéro issu de la séquence. Montants **recalculés
 serveur** à partir de la base — le client n'envoie que des identifiants et des quantités.
 Validation des promos côté serveur, réservée aux comptes connectés.
 
