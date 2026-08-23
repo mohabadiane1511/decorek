@@ -26,19 +26,22 @@ for (const chemin of ["/", "/boutique"]) {
         }),
     );
 
-    await page.waitForFunction(() => Array.from(document.images).every((img) => img.complete));
+    // Relevé répété plutôt qu'unique : le déclenchement du chargement différé et la
+    // réception des images ne sont pas synchrones, et un contrôle pris à un seul instant
+    // rend le test instable — il échouait environ une fois sur cinq.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() =>
+            Array.from(document.images)
+              .filter((img) => !img.complete || img.naturalWidth === 0)
+              .map((img) => img.currentSrc || img.src),
+          ),
+        { message: `images non chargées sur ${chemin}`, timeout: 15_000 },
+      )
+      .toEqual([]);
 
-    const images = await page.evaluate(() =>
-      Array.from(document.images).map((img) => ({
-        src: img.currentSrc || img.src,
-        chargée: img.naturalWidth > 0,
-      })),
-    );
-
-    expect(images.length, `aucune image trouvée sur ${chemin}`).toBeGreaterThan(0);
-    expect(
-      images.filter((i) => !i.chargée).map((i) => i.src),
-      `images non chargées sur ${chemin}`,
-    ).toEqual([]);
+    const total = await page.evaluate(() => document.images.length);
+    expect(total, `aucune image trouvée sur ${chemin}`).toBeGreaterThan(0);
   });
 }

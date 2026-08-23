@@ -6,7 +6,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // Le client Prisma est généré : on ne corrige pas du code qu'on n'écrit pas, et il
+  // serait réécrit au prochain `db:generate`.
+  { ignores: ["dist", ".output", ".vinxi", "backend/src/generated"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

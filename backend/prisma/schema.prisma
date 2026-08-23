@@ -1,0 +1,313 @@
+// Schéma de la boutique Deco'Rek.
+//
+// Tous les montants sont des entiers en FCFA : le franc CFA n'a pas de sous-unité en
+// usage, et un flottant sur de l'argent finit toujours par produire un centime fantôme.
+//
+// Ce schéma diverge volontairement de src/data/types.ts, qui reste le contrat exposé au
+// front. Les écarts sont documentés dans docs/plan-backend-decorek.md §3, lot 3.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7 : l'URL ne vit plus ici. Les migrations la lisent dans prisma.config.ts,
+// et le client la reçoit par son adaptateur.
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- Catalogue
+
+model Category {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  name              String
+  categoryId        String   @map("category_id")
+  price             Int
+  oldPrice          Int?     @map("old_price")
+  stock             Int      @default(0)
+  lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  description       String
+  featured          Boolean  @default(false)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Restrict : supprimer une catégorie qui contient des produits doit échouer
+  // franchement, plutôt que de les rendre orphelins ou de les effacer en cascade.
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images         ProductImage[]
+  stockMovements StockMovement[]
+  orderItems     OrderItem[]
+
+  @@index([categoryId])
+  @@index([featured])
+  @@index([createdAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String  @map("product_id")
+  url       String
+  position  Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Index simple et non unique à dessein : réordonner par glisser-déposer échange des
+  // positions, ce qui viole momentanément une contrainte d'unicité. L'unicité est tenue
+  // par le code, qui réécrit toutes les positions d'un produit en une transaction.
+  @@index([productId, position])
+  @@map("product_images")
+}
+
+// ---------------------------------------------------------------- Livraison
+
+model DeliveryRegion {
+  id    String         @id @default(cuid())
+  name  String         @unique
+  areas DeliveryArea[]
+
+  @@map("delivery_regions")
+}
+
+model DeliveryArea {
+  id       String         @id @default(cuid())
+  regionId String         @map("region_id")
+  name     String
+  fee      Int
+  region   DeliveryRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([regionId, name])
+  @@map("delivery_areas")
+}
+
+// ---------------------------------------------------------------- Commandes
+
+enum OrderStatus {
+  en_attente
+  confirmee
+  preparation
+  en_livraison
+  livree
+  non_honoree
+  annulee
+
+  @@map("order_status")
+}
+
+model Order {
+  id     String @id @default(cuid())
+  number String @unique
+
+  customerName  String  @map("customer_name")
+  customerPhone String  @map("customer_phone")
+  customerEmail String? @map("customer_email")
+
+  // Nom de région et de zone recopiés : renommer ou supprimer une zone ne doit jamais
+  // réécrire l'adresse d'une commande déjà passée.
+  regionId    String? @map("region_id")
+  regionName  String  @map("region_name")
+  areaName    String  @map("area_name")
+  address     String
+  deliveryFee Int     @map("delivery_fee")
+  note        String?
+
+  subtotal  Int
+  discount  Int         @default(0)
+  promoCode String?     @map("promo_code")
+  total     Int
+  status    OrderStatus @default(en_attente)
+  paid      Boolean     @default(false)
+
+  userId       String?  @map("user_id")
+  internalNote String?  @map("internal_note")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  stockMovements StockMovement[]
+  redemption     PromoRedemption?
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String @map("order_id")
+
+  // Nom, prix et image sont recopiés au moment de la commande. productId peut devenir
+  // nul : une commande passée doit rester lisible même si le produit est supprimé.
+  productId String? @map("product_id")
+  name      String
+  price     Int
+  quantity  Int
+  image     String
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ---------------------------------------------------------------- Stock
+
+enum StockMovementReason {
+  commande
+  annulation
+  reapprovisionnement
+  correction
+
+  @@map("stock_movement_reason")
+}
+
+// Journal des mouvements. Product.stock reste la valeur courante, mais toute variation
+// écrit une ligne ici : c'est ce qui rend impossible la double restauration de stock, et
+// c'est ce qui manquait à la maquette pour gérer le retour d'une commande annulée.
+model StockMovement {
+  id        String              @id @default(cuid())
+  productId String              @map("product_id")
+  delta     Int
+  reason    StockMovementReason
+  orderId   String?             @map("order_id")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Un même couple commande/produit ne peut être joué qu'une fois par motif : filet
+  // en base contre une annulation appliquée deux fois.
+  @@unique([orderId, productId, reason])
+  @@index([productId])
+  @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------- Promotions
+
+enum PromoType {
+  percent
+  amount
+
+  @@map("promo_type")
+}
+
+model PromoCode {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  type      PromoType
+  value     Int
+  minAmount Int       @map("min_amount")
+  startsAt  DateTime  @map("starts_at")
+  endsAt    DateTime  @map("ends_at")
+  maxUses   Int       @map("max_uses")
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  redemptions PromoRedemption[]
+
+  @@map("promo_codes")
+}
+
+// Remplace le compteur `uses` de la maquette : une ligne par utilisation. Un compteur
+// se désynchronise et ne dit pas qui a utilisé le code ; ces lignes permettent en plus
+// de plafonner par client.
+model PromoRedemption {
+  id          String   @id @default(cuid())
+  promoCodeId String   @map("promo_code_id")
+  orderId     String   @unique @map("order_id")
+  userId      String?  @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([promoCodeId])
+  @@map("promo_redemptions")
+}
+
+// ---------------------------------------------------------------- Comptes
+
+enum Role {
+  admin
+  client
+
+  @@map("role")
+}
+
+// Structure volontairement minimale : l'authentification arrive au lot 10 avec Better
+// Auth, qui apportera ses propres tables de sessions et de comptes.
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  roles       UserRole[]
+  orders      Order[]
+  redemptions PromoRedemption[]
+
+  @@map("users")
+}
+
+// Rôles dans leur propre table, jamais en colonne sur `users` : c'est la consigne de la
+// passation, et cela permet d'en accorder plusieurs sans migration.
+model UserRole {
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+  role   Role
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@map("user_roles")
+}
+
+// ---------------------------------------------------------------- Contenu
+
+// Ligne unique, contrainte par un CHECK ajouté en migration SQL.
+model SiteContent {
+  id               Int      @id @default(1)
+  bannerTitle      String   @map("banner_title")
+  bannerSubtitle   String   @map("banner_subtitle")
+  bannerCta        String   @map("banner_cta")
+  whatsapp         String
+  phone            String
+  email            String
+  address          String
+  freeShippingFrom Int      @map("free_shipping_from")
+  pageContact      String   @map("page_contact")
+  pageLivraison    String   @map("page_livraison")
+  pageApropos      String   @map("page_apropos")
+  pageCgv          String   @map("page_cgv")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("site_content")
+}
+
+// Compteur de numéros de commande, un par mois (période au format YYMM).
+// Une séquence Postgres unique ne convient pas : le format DR-YYMM-XXXX ne tient que
+// quatre chiffres, et un compteur global finirait par déborder. L'incrément se fait par
+// un INSERT ... ON CONFLICT DO UPDATE, atomique même sous forte concurrence.
+model OrderNumberCounter {
+  period  String @id @db.Char(4)
+  counter Int    @default(0)
+
+  @@map("order_number_counters")
+}

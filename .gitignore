@@ -20,6 +20,9 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Client Prisma généré : reproductible par `npm run db:generate`
+backend/src/generated/
+
 # Secrets
 .env
 .env.*

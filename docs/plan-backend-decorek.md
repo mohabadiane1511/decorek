@@ -163,14 +163,21 @@ l'extérieur**. À vérifier explicitement depuis une machine tierce.
 | `product_images` | table séparée avec `position` | le réordonnancement par glisser-déposer devient une mise à jour de `position` |
 | `stock_movements` | journal des mouvements | corrige le trou décrit en §4 |
 | `promo_redemptions` | une ligne par utilisation | permet de savoir *qui* a utilisé un code et de plafonner par client |
-| `order_number_seq` | séquence Postgres | remplace le tirage aléatoire qui collisionne (§4) |
+| `order_number_counters` | compteur par mois | remplace le tirage aléatoire qui collisionne (§4) |
 
 Les autres suivent la passation : `categories`, `products`, `orders`, `order_items` (snapshot du
 prix, du nom et de l'image), `delivery_regions`, `delivery_areas`, `site_content` (singleton),
 `users`, et `user_roles` **en table séparée**.
 
-La séquence des numéros de commande n'ayant pas d'équivalent dans le langage de Prisma, elle est
-créée par une migration SQL écrite à la main — `prisma migrate` sait les intégrer.
+Une séquence Postgres unique ne convient pas pour les numéros de commande : le format
+`DR-YYMM-XXXX` ne réserve que quatre chiffres, et un compteur global finirait par déborder. On
+utilise donc une table de compteurs, un par mois, incrémentée par un `INSERT … ON CONFLICT DO
+UPDATE` — atomique même sous forte concurrence, et qui repart de 1 chaque mois.
+
+Les garde-fous que le langage de Prisma ne sait pas exprimer (contraintes `CHECK`) sont ajoutés
+par une migration SQL écrite à la main, que `prisma migrate` intègre normalement : montants
+positifs, remise plafonnée au sous-total, total égal à `sous-total − remise + livraison`, stock
+jamais négatif, pourcentage de promotion inférieur à 100, fenêtre de validité cohérente.
 
 *Tests* : migration appliquée sur une base vierge sans erreur ; contraintes d'unicité vérifiées
 (slug produit, numéro de commande, code promo) ; `prisma migrate diff` ne détecte aucun écart
