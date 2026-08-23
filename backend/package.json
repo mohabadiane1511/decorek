@@ -7,12 +7,15 @@
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset --force",
     "db:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:status": "prisma migrate status",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1116.0",
+    "@aws-sdk/s3-request-presigner": "^3.1116.0",
     "@prisma/adapter-pg": "^7.0.0",
     "@prisma/client": "^7.0.0",
     "pg": "^8.13.1"

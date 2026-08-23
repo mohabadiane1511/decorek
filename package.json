@@ -16,6 +16,7 @@
     "infra:check": "bash scripts/check-infra.sh",
     "db:migrate": "npm run --prefix backend db:migrate",
     "db:generate": "npm run --prefix backend db:generate",
+    "db:seed": "npm run --prefix backend db:seed",
     "db:studio": "npm run --prefix backend db:studio",
     "db:status": "npm run --prefix backend db:status",
     "test:backend": "npm run --prefix backend test",

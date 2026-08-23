@@ -188,11 +188,20 @@ sans migration correspondante.
 
 #### Lot 4 — Données initiales · `feat/db-seed`
 
-Import de [seed.ts](../src/data/seed.ts) en base et envoi des 11 images de `public/images/` vers
-MinIO, les URLs en base pointant vers `/media/...`.
+Import de [seed.ts](../src/data/seed.ts) en base et envoi des **images produits** vers MinIO, les
+URLs en base pointant vers `/media/...`.
+
+Seules les images de produits partent au stockage : ce sont des données, modifiables depuis
+l'administration. Le logo et l'image du héros restent dans `public/images/` — ce sont des
+éléments de l'interface, servis directement par le front, et les faire transiter par le stockage
+ajouterait une dépendance sans rien apporter.
+
+Les commandes de démonstration ne sont pas importées : elles devraient s'accompagner de
+mouvements de stock cohérents, et une base sans fausses ventes rend les calculs vérifiables.
 
 *Tests* : après seed, 5 catégories, 8 produits, 5 régions, 16 zones, 2 promos ; chaque produit a
-au moins une image dont l'URL répond en 200.
+au moins une image dont l'URL **répond réellement en 200 avec un type d'image** ; positions
+d'images contiguës à partir de zéro.
 *Vérification* : les images apparaissent dans la console MinIO.
 *Fin de lot* : `npm run db:seed` est rejouable sans doublon.
 
