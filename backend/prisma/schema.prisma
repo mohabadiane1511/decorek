@@ -9,6 +9,9 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // Sans cela, le client généré s'importe lui-même en « .ts » : utilisable avec un
+  // runtime TypeScript, mais introuvable une fois compilé pour la production.
+  importFileExtension = "js"
 }
 
 // Prisma 7 : l'URL ne vit plus ici. Les migrations la lisent dans prisma.config.ts,

@@ -17,7 +17,7 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 rate() { printf '  \033[31m✗\033[0m %s\n' "$1"; echec=1; }
 
 echo "État des conteneurs"
-for service in db cache storage; do
+for service in db cache storage api; do
   etat=$($COMPOSE ps --format '{{.Health}}' "$service" 2>/dev/null | head -1)
   [ "$etat" = "healthy" ] && ok "$service : $etat" || rate "$service : ${etat:-absent}"
 done
@@ -58,6 +58,22 @@ if $COMPOSE run --rm --no-deps -T --entrypoint sh storage-init -c "
   ok "bucket ${MINIO_BUCKET} : écriture, lecture et suppression"
 else
   rate "bucket ${MINIO_BUCKET} : aller-retour impossible"
+fi
+
+echo "API"
+sante=$(curl -s --max-time 10 "http://localhost:${API_PORT:-53000}/api/health" || echo "")
+if printf '%s' "$sante" | grep -q '"database":"ok"'; then
+  ok "api : en ligne, base joignable"
+else
+  rate "api : contrôle de santé en échec (${sante:-aucune réponse})"
+fi
+
+# Les routes de diagnostic doivent rester absentes de l'image de production.
+if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+      "http://localhost:${API_PORT:-53000}/api/_diag/boom")" = "404" ]; then
+  ok "api : routes de diagnostic absentes"
+else
+  rate "api : routes de diagnostic EXPOSÉES"
 fi
 
 echo "Exposition réseau"
