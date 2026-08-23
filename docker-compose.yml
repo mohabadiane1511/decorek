@@ -1,0 +1,90 @@
+name: decorek
+
+# Fichier de base, valable en production : AUCUN service ne publie de port.
+# Les services se joignent entre eux par leur nom sur le réseau interne.
+# Pour le développement local, voir docker-compose.dev.yml et `npm run infra:up`.
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant, copier .env.example en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB manquant}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD manquant}
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      # Le cache est reconstructible : mieux vaut évincer les clés froides que refuser
+      # les écritures une fois la mémoire pleine.
+      - --maxmemory-policy
+      - allkeys-lru
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      # Persisté pour qu'un redémarrage ne déconnecte pas tout le monde (les sessions
+      # vivent ici), mais hors stratégie de sauvegarde : rien d'irremplaçable.
+      - cache-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  storage:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER manquant}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD manquant}
+    volumes:
+      - storage-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # Crée le bucket et le rend lisible publiquement (les images produits sont servies
+  # au navigateur via /media). Se termine aussitôt : ce n'est pas un service permanent.
+  storage-init:
+    image: minio/mc:latest
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-decorek-media}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set local http://storage:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set download "local/$$MINIO_BUCKET"
+        echo "bucket $$MINIO_BUCKET prêt"
+
+volumes:
+  db-data:
+  cache-data:
+  storage-data:

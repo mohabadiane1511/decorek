@@ -20,6 +20,11 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Secrets
+.env
+.env.*
+!.env.example
+
 # Tests
 test-results/
 playwright-report/

@@ -1,0 +1,27 @@
+# Développement local UNIQUEMENT. Ne jamais déployer avec ce fichier.
+#
+# L'API tournera sur la machine hôte avant d'être conteneurisée (lot 18) : elle a donc
+# besoin d'atteindre ces services. Les ports sont liés explicitement à 127.0.0.1, jamais
+# à 0.0.0.0 — sans quoi Docker écrit des règles iptables qui court-circuitent le pare-feu
+# de l'hôte et publient la base sur Internet, même avec un UFW qui l'affiche fermée.
+#
+# Les ports côté hôte sont décalés par défaut pour ne pas entrer en conflit avec un
+# PostgreSQL, un Redis ou un php-fpm déjà installés sur la machine. Surchargeables
+# dans .env. Côté conteneur, les ports restent standards.
+#
+# Ce fichier n'est pas chargé automatiquement : `docker compose up` seul reste sûr.
+# Utiliser `npm run infra:up`.
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:${DB_PORT:-55432}:5432"
+
+  cache:
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-56379}:6379"
+
+  storage:
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-59000}:9000" # API S3
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-59001}:9001" # console web

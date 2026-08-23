@@ -82,6 +82,22 @@ pare-feu de l'hôte, exposant le service sur Internet malgré un UFW qui l'affic
 exposé sans mot de passe est l'une des compromissions les plus courantes qui soient. Pour déboguer
 depuis le poste local, on passe par un tunnel SSH.
 
+### Organisation du dépôt
+
+Un seul dépôt, deux applications côte à côte :
+
+```
+src/         front TanStack Start (existant)
+backend/     API, schéma, migrations et seed  ← tout le code serveur va ici
+e2e/         tests de bout en bout
+scripts/     outillage (vérification d'infrastructure, sauvegardes)
+docs/        ce plan et la passation
+```
+
+**Tout le code backend vit dans `backend/`**, y compris son `package.json`, ses migrations et
+ses tests. Le front n'importe jamais depuis `backend/` : le seul contrat entre les deux est
+`src/data/types.ts`, que le backend importe en lecture pour rester aligné.
+
 **Pourquoi Hono + Drizzle** : tout reste en TypeScript, donc `src/data/types.ts` devient le
 contrat partagé entre l'API et le front, sans duplication ni génération de code. Drizzle produit
 des migrations SQL lisibles. Hono expose `app.request()`, qui permet de tester les endpoints sans
@@ -155,8 +171,8 @@ au moins une image dont l'URL répond en 200.
 
 #### Lot 5 — Ossature de l'API · `feat/api-bootstrap`
 
-Service Hono conteneurisé : configuration, `/api/health`, format d'erreur unifié, validation par
-`zod` (déjà une dépendance du projet), journalisation.
+Service Hono conteneurisé, **dans `backend/`** : configuration, `/api/health`, format d'erreur
+unifié, validation par `zod` (déjà une dépendance du projet), journalisation.
 
 *Tests* : `/api/health` répond 200 ; une requête invalide renvoie une erreur au format attendu.
 *Fin de lot* : `docker compose up` démarre aussi l'API, joignable **uniquement** via le proxy.
