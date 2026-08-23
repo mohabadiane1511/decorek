@@ -1,0 +1,25 @@
+# Le contexte de construction est la racine : on n'y envoie que le strict nécessaire.
+node_modules
+**/node_modules
+backend/dist
+backend/src/generated
+.output
+.vinxi
+.nitro
+.wrangler
+dist
+
+# Le front n'entre pas dans l'image de l'API ; seul src/data (le contrat de données)
+# est copié explicitement par le Dockerfile.
+public
+e2e
+test-results
+playwright-report
+docs
+.lovable
+.git
+
+.env
+.env.*
+!.env.example
+*.log

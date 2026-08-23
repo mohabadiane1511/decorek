@@ -86,7 +86,10 @@ services:
 
   api:
     build:
-      context: ./backend
+      # Racine du dépôt : la compilation a besoin de src/data/types.ts, le contrat
+      # partagé avec le front. Voir l'en-tête de backend/Dockerfile.
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     depends_on:
       db:

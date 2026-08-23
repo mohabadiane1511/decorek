@@ -6,6 +6,7 @@ import { zValidator } from "@hono/zod-validator";
 import type { Config } from "./config.js";
 import { ErreurApi, corpsErreur, gererErreur } from "./erreurs.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
+import { routesCatalogue } from "./routes/catalogue.js";
 
 export type Dependances = {
   config: Config;
@@ -35,6 +36,8 @@ export function creerApp({ config, prisma }: Dependances): Hono {
     }
     return c.json({ status: "ok" as const, database: "ok" as const });
   });
+
+  app.route("/api", routesCatalogue(prisma));
 
   // Routes de diagnostic : jamais montées en production. Elles servent aux tests du
   // contrat d'erreur, mais /api/boom offrirait sinon un moyen commode de polluer les
