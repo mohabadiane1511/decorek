@@ -24,10 +24,7 @@ function NotFoundComponent() {
           Cette page n'existe pas ou a été déplacée.
         </p>
         <div className="mt-6">
-          <Link
-            to="/"
-            className="btn-square btn-solid"
-          >
+          <Link to="/" className="btn-square btn-solid">
             Retour à l'accueil
           </Link>
         </div>
@@ -60,10 +57,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Réessayer
           </button>
-          <a
-            href="/"
-            className="btn-square btn-outline"
-          >
+          <a href="/" className="btn-square btn-outline">
             Accueil
           </a>
         </div>

@@ -62,7 +62,10 @@ type StoreValue = State & {
   cartSubtotal: number;
   signIn: (user: SessionUser) => void;
   signOut: () => void;
-  validatePromo: (code: string, subtotal: number) => { promo: PromoCode; discount: number } | { error: string };
+  validatePromo: (
+    code: string,
+    subtotal: number,
+  ) => { promo: PromoCode; discount: number } | { error: string };
   placeOrder: (order: Order) => void;
   updateOrder: (id: string, patch: Partial<Order>) => void;
   setOrderStatus: (id: string, status: OrderStatus) => void;
@@ -141,9 +144,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       signIn: (user) => patch((s) => ({ ...s, user })),
       signOut: () => patch((s) => ({ ...s, user: null })),
       validatePromo: (code, subtotal) => {
-        const promo = state.promos.find(
-          (p) => p.code.toUpperCase() === code.trim().toUpperCase(),
-        );
+        const promo = state.promos.find((p) => p.code.toUpperCase() === code.trim().toUpperCase());
         if (!promo) return { error: "Ce code promo n'existe pas." };
         if (!promo.active) return { error: "Ce code promo n'est plus actif." };
         const now = Date.now();

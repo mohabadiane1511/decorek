@@ -20,9 +20,7 @@ export function Header() {
     <header className="sticky top-0 z-40 bg-background">
       {barVisible && (
         <div className="relative bg-foreground px-10 py-2.5 text-center text-background">
-          <span className="label-mono">
-            Paiement à la livraison · Dakar &amp; régions
-          </span>
+          <span className="label-mono">Paiement à la livraison · Dakar &amp; régions</span>
           <button
             onClick={() => setBarVisible(false)}
             aria-label="Fermer"
@@ -50,7 +48,11 @@ export function Header() {
             className="order-2 flex min-w-0 shrink-0 items-center gap-2 md:order-1"
             onClick={() => setOpen(false)}
           >
-            <img src={logo} alt="Deco'Rek Home & Events" className="h-12 w-12 shrink-0 md:h-10 md:w-10" />
+            <img
+              src={logo}
+              alt="Deco'Rek Home & Events"
+              className="h-12 w-12 shrink-0 md:h-10 md:w-10"
+            />
             <span className="label-mono hidden text-[0.8rem] sm:block">Deco'Rek</span>
           </Link>
 

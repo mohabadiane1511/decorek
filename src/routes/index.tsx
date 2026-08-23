@@ -60,10 +60,7 @@ function Index() {
           <p className="mt-6 max-w-xl text-[0.95rem] leading-relaxed text-white/80 sm:mt-8 sm:text-base">
             {content.bannerSubtitle}
           </p>
-          <Link
-            to="/boutique"
-            className="btn-square btn-solid mt-8 sm:mt-10"
-          >
+          <Link to="/boutique" className="btn-square btn-solid mt-8 sm:mt-10">
             {content.bannerCta}
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -73,23 +70,23 @@ function Index() {
       {/* Bande de réassurance */}
       <div className="border-b border-border bg-accent">
         <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-white/15 md:grid-cols-4">
-          {["Paiement à la réception", "Livraison régions", "Vaisselle & décoration", "Conseil WhatsApp"].map(
-            (t, i) => (
-              <p
-                key={t}
-                className={`label-mono px-4 py-5 text-center leading-tight text-white sm:px-6 ${
-                  i > 1 ? "border-t border-white/15 md:border-t-0" : ""
-                } ${i === 2 ? "border-l-0 md:border-l" : ""}`}
-              >
-                {t}
-              </p>
-            ),
-          )}
+          {[
+            "Paiement à la réception",
+            "Livraison régions",
+            "Vaisselle & décoration",
+            "Conseil WhatsApp",
+          ].map((t, i) => (
+            <p
+              key={t}
+              className={`label-mono px-4 py-5 text-center leading-tight text-white sm:px-6 ${
+                i > 1 ? "border-t border-white/15 md:border-t-0" : ""
+              } ${i === 2 ? "border-l-0 md:border-l" : ""}`}
+            >
+              {t}
+            </p>
+          ))}
         </div>
       </div>
-
-
-
 
       {/* 02 — Collections */}
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6">

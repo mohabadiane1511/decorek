@@ -11,8 +11,8 @@ type Search = { categorie?: string | undefined; q?: string | undefined };
 
 export const Route = createFileRoute("/boutique")({
   validateSearch: (search: Record<string, unknown>): Search => ({
-    categorie: typeof search['categorie'] === "string" ? search['categorie'] : undefined,
-    q: typeof search['q'] === "string" ? search['q'] : undefined,
+    categorie: typeof search["categorie"] === "string" ? search["categorie"] : undefined,
+    q: typeof search["q"] === "string" ? search["q"] : undefined,
   }),
   head: () => ({
     meta: [
@@ -39,10 +39,7 @@ function Boutique() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/boutique" });
 
-  const maxPrice = useMemo(
-    () => Math.max(50000, ...products.map((p) => p.price)),
-    [products],
-  );
+  const maxPrice = useMemo(() => Math.max(50000, ...products.map((p) => p.price)), [products]);
   const [priceMax, setPriceMax] = useState(maxPrice);
   const [sort, setSort] = useState("recent");
   const [page, setPage] = useState(1);
@@ -77,7 +74,11 @@ function Boutique() {
       <PageHeader
         index="01 — Collection complète"
         title={activeCategory ? activeCategory.name : "La boutique"}
-        intro={activeCategory ? activeCategory.description : "Toutes nos pièces, du dressage de table au mobilier de réception."}
+        intro={
+          activeCategory
+            ? activeCategory.description
+            : "Toutes nos pièces, du dressage de table au mobilier de réception."
+        }
         aside={`${filtered.length} pièce${filtered.length > 1 ? "s" : ""}`}
       />
 
@@ -97,9 +98,7 @@ function Boutique() {
               key={c.id}
               onClick={() => setCategory(c.slug)}
               className={`label-mono px-4 py-3 transition-colors ${
-                activeCategory?.id === c.id
-                  ? "bg-foreground text-background"
-                  : "hover:bg-muted"
+                activeCategory?.id === c.id ? "bg-foreground text-background" : "hover:bg-muted"
               }`}
             >
               {c.name}
@@ -167,7 +166,9 @@ function Boutique() {
                 key={n}
                 onClick={() => setPage(n)}
                 className={`label-mono h-10 w-10 border transition-colors ${
-                  n === current ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"
+                  n === current
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border hover:bg-muted"
                 }`}
               >
                 {n}

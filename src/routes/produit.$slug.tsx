@@ -95,9 +95,7 @@ function ProductPage() {
               {product.stock === 0 ? (
                 <span className="text-destructive">Article épuisé</span>
               ) : product.stock <= product.lowStockThreshold ? (
-                <span className="text-orange-brand">
-                  Plus que {product.stock} en stock
-                </span>
+                <span className="text-orange-brand">Plus que {product.stock} en stock</span>
               ) : (
                 <span className="text-muted-foreground">En stock</span>
               )}

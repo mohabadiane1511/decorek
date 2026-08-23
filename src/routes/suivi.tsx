@@ -12,7 +12,8 @@ export const Route = createFileRoute("/suivi")({
       { title: "Suivre ma commande | Deco'Rek" },
       {
         name: "description",
-        content: "Saisissez votre numéro de commande Deco'Rek pour connaître son statut de livraison.",
+        content:
+          "Saisissez votre numéro de commande Deco'Rek pour connaître son statut de livraison.",
       },
       { property: "og:title", content: "Suivi de commande — Deco'Rek" },
       { property: "og:description", content: "Suivez votre livraison à Dakar et en régions." },
@@ -41,10 +42,7 @@ function Suivi() {
             placeholder="DR-2608-1042"
             className="rounded-none"
           />
-          <button
-            onClick={() => setSearched(true)}
-            className="btn-square btn-solid"
-          >
+          <button onClick={() => setSearched(true)} className="btn-square btn-solid">
             Rechercher
           </button>
         </div>

@@ -13,7 +13,10 @@ export const Route = createFileRoute("/livraison")({
           "Zones et frais de livraison à Dakar, en banlieue et en régions. Paiement uniquement à la livraison.",
       },
       { property: "og:title", content: "Livraison & paiement — Deco'Rek" },
-      { property: "og:description", content: "Tarifs par quartier et par région, délais 24h à 5 jours." },
+      {
+        property: "og:description",
+        content: "Tarifs par quartier et par région, délais 24h à 5 jours.",
+      },
     ],
   }),
   component: Livraison,

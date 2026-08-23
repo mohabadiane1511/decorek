@@ -34,7 +34,9 @@ function Contact() {
           ].map((c) => (
             <div key={c.label} className="border border-border p-5">
               <c.icon className="h-5 w-5 text-orange-brand" strokeWidth={1.5} />
-              <p className="mt-3 text-xs tracking-wide text-muted-foreground uppercase">{c.label}</p>
+              <p className="mt-3 text-xs tracking-wide text-muted-foreground uppercase">
+                {c.label}
+              </p>
               <p className="mt-1 text-sm">{c.value}</p>
             </div>
           ))}

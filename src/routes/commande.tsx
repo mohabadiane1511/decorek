@@ -19,23 +19,18 @@ export const Route = createFileRoute("/commande")({
           "Renseignez vos coordonnées de livraison. Commande validée à la soumission, paiement à la réception.",
       },
       { property: "og:title", content: "Finaliser ma commande — Deco'Rek" },
-      { property: "og:description", content: "Livraison à Dakar et en régions, paiement à la livraison." },
+      {
+        property: "og:description",
+        content: "Livraison à Dakar et en régions, paiement à la livraison.",
+      },
     ],
   }),
   component: Commande,
 });
 
 function Commande() {
-  const {
-    cart,
-    products,
-    cartSubtotal,
-    regions,
-    content,
-    user,
-    validatePromo,
-    placeOrder,
-  } = useStore();
+  const { cart, products, cartSubtotal, regions, content, user, validatePromo, placeOrder } =
+    useStore();
   const navigate = useNavigate();
 
   const [name, setName] = useState(user?.name ?? "");
@@ -154,15 +149,32 @@ function Commande() {
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="name">Nom complet *</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5 rounded-none" />
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1.5 rounded-none"
+                />
               </div>
               <div>
                 <Label htmlFor="phone">Téléphone *</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="77 000 00 00" className="mt-1.5 rounded-none" />
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="77 000 00 00"
+                  className="mt-1.5 rounded-none"
+                />
               </div>
               <div className="sm:col-span-2">
                 <Label htmlFor="email">Email (facultatif)</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1.5 rounded-none" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="mt-1.5 rounded-none"
+                />
               </div>
             </div>
           </section>
@@ -206,11 +218,22 @@ function Commande() {
               </div>
               <div className="sm:col-span-2">
                 <Label htmlFor="address">Adresse précise *</Label>
-                <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1.5 rounded-none" />
+                <Input
+                  id="address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="mt-1.5 rounded-none"
+                />
               </div>
               <div className="sm:col-span-2">
                 <Label htmlFor="note">Indications pour le livreur</Label>
-                <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} className="mt-1.5 rounded-none" rows={3} />
+                <Textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="mt-1.5 rounded-none"
+                  rows={3}
+                />
               </div>
             </div>
           </section>
@@ -251,7 +274,6 @@ function Commande() {
               </li>
             ))}
           </ul>
-
 
           <div className="mt-5 border-t border-border pt-5">
             <Label htmlFor="promo" className="text-xs tracking-wide uppercase">
@@ -306,10 +328,7 @@ function Commande() {
             </div>
           </dl>
 
-          <button
-            type="submit"
-            className="btn-square btn-solid mt-6 w-full"
-          >
+          <button type="submit" className="btn-square btn-solid mt-6 w-full">
             Valider ma commande
           </button>
         </aside>

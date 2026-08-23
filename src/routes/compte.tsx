@@ -57,21 +57,35 @@ function Compte() {
             {mode === "signup" && (
               <div>
                 <Label htmlFor="n">Nom complet</Label>
-                <Input id="n" value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5 rounded-none" />
+                <Input
+                  id="n"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1.5 rounded-none"
+                />
               </div>
             )}
             <div>
               <Label htmlFor="e">Email</Label>
-              <Input id="e" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1.5 rounded-none" />
+              <Input
+                id="e"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1.5 rounded-none"
+              />
             </div>
             <div>
               <Label htmlFor="p">Mot de passe</Label>
-              <Input id="p" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1.5 rounded-none" />
+              <Input
+                id="p"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1.5 rounded-none"
+              />
             </div>
-            <button
-              type="submit"
-              className="btn-square btn-solid w-full"
-            >
+            <button type="submit" className="btn-square btn-solid w-full">
               {mode === "login" ? "Se connecter" : "Créer mon compte"}
             </button>
             <button

@@ -1,5 +1,7 @@
 export function formatFcfa(value: number): string {
-  return `${Math.round(value).toLocaleString("fr-FR").replace(/\u202f|\u00a0/g, " ")} FCFA`;
+  return `${Math.round(value)
+    .toLocaleString("fr-FR")
+    .replace(/\u202f|\u00a0/g, " ")} FCFA`;
 }
 
 export function formatDate(iso: string): string {

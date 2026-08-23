@@ -24,7 +24,10 @@ export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
       { title: "Back-office | Deco'Rek" },
-      { name: "description", content: "Gestion des produits, stocks, commandes et promotions Deco'Rek." },
+      {
+        name: "description",
+        content: "Gestion des produits, stocks, commandes et promotions Deco'Rek.",
+      },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Back-office Deco'Rek" },
       { property: "og:description", content: "Espace de gestion réservé à l'équipe." },
@@ -72,7 +75,10 @@ function Admin() {
             >
               Réinitialiser
             </button>
-            <Link to="/" className="label-mono border border-border px-4 py-2 transition-colors hover:bg-muted">
+            <Link
+              to="/"
+              className="label-mono border border-border px-4 py-2 transition-colors hover:bg-muted"
+            >
               Voir le site
             </Link>
           </div>
@@ -309,7 +315,6 @@ function Orders() {
               ))}
             </ul>
 
-
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <select
                 value={o.status}
@@ -398,7 +403,11 @@ function Products() {
         <div className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-2">
           <div>
             <Label>Nom</Label>
-            <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="mt-1.5 rounded-none" />
+            <Input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Catégorie</Label>
@@ -416,15 +425,30 @@ function Products() {
           </div>
           <div>
             <Label>Prix (FCFA)</Label>
-            <Input type="number" value={draft.price} onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })} className="mt-1.5 rounded-none" />
+            <Input
+              type="number"
+              value={draft.price}
+              onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Stock</Label>
-            <Input type="number" value={draft.stock} onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) })} className="mt-1.5 rounded-none" />
+            <Input
+              type="number"
+              value={draft.stock}
+              onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Seuil d'alerte stock</Label>
-            <Input type="number" value={draft.lowStockThreshold} onChange={(e) => setDraft({ ...draft, lowStockThreshold: Number(e.target.value) })} className="mt-1.5 rounded-none" />
+            <Input
+              type="number"
+              value={draft.lowStockThreshold}
+              onChange={(e) => setDraft({ ...draft, lowStockThreshold: Number(e.target.value) })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div className="sm:col-span-2">
             <Label>Images du produit</Label>
@@ -502,12 +526,16 @@ function Products() {
                 </div>
               </>
             )}
-
           </div>
 
           <div className="sm:col-span-2">
             <Label>Description</Label>
-            <Textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} rows={3} className="mt-1.5 rounded-none" />
+            <Textarea
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              rows={3}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -544,7 +572,9 @@ function Products() {
               <tr key={p.id}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    {p.images[0] && <img src={p.images[0]} alt="" className="h-10 w-10 object-cover" />}
+                    {p.images[0] && (
+                      <img src={p.images[0]} alt="" className="h-10 w-10 object-cover" />
+                    )}
                     <span>{p.name}</span>
                   </div>
                 </td>
@@ -642,16 +672,30 @@ function Categories() {
         <div className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-2">
           <div>
             <Label>Nom</Label>
-            <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="mt-1.5 rounded-none" />
+            <Input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Slug (généré automatiquement)</Label>
-            <Input value={slugify(draft.name)} readOnly disabled className="mt-1.5 rounded-none bg-muted" />
+            <Input
+              value={slugify(draft.name)}
+              readOnly
+              disabled
+              className="mt-1.5 rounded-none bg-muted"
+            />
           </div>
 
           <div className="sm:col-span-2">
             <Label>Description</Label>
-            <Textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} rows={2} className="mt-1.5 rounded-none" />
+            <Textarea
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              rows={2}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div className="flex gap-2 sm:col-span-2">
             <button
@@ -678,7 +722,10 @@ function Categories() {
       )}
       <ul className="divide-y divide-border border border-border bg-background">
         {categories.map((c) => (
-          <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+          <li
+            key={c.id}
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+          >
             <div>
               <p>{c.name}</p>
               <p className="text-xs text-muted-foreground">/{c.slug}</p>
@@ -730,7 +777,11 @@ function Promos() {
         <div className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-3">
           <div>
             <Label>Code</Label>
-            <Input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase() })} className="mt-1.5 rounded-none" />
+            <Input
+              value={draft.code}
+              onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase() })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Type</Label>
@@ -745,23 +796,48 @@ function Promos() {
           </div>
           <div>
             <Label>Valeur</Label>
-            <Input type="number" value={draft.value} onChange={(e) => setDraft({ ...draft, value: Number(e.target.value) })} className="mt-1.5 rounded-none" />
+            <Input
+              type="number"
+              value={draft.value}
+              onChange={(e) => setDraft({ ...draft, value: Number(e.target.value) })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Montant minimum</Label>
-            <Input type="number" value={draft.minAmount} onChange={(e) => setDraft({ ...draft, minAmount: Number(e.target.value) })} className="mt-1.5 rounded-none" />
+            <Input
+              type="number"
+              value={draft.minAmount}
+              onChange={(e) => setDraft({ ...draft, minAmount: Number(e.target.value) })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Début</Label>
-            <Input type="date" value={draft.startsAt.slice(0, 10)} onChange={(e) => setDraft({ ...draft, startsAt: e.target.value })} className="mt-1.5 rounded-none" />
+            <Input
+              type="date"
+              value={draft.startsAt.slice(0, 10)}
+              onChange={(e) => setDraft({ ...draft, startsAt: e.target.value })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Fin</Label>
-            <Input type="date" value={draft.endsAt.slice(0, 10)} onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })} className="mt-1.5 rounded-none" />
+            <Input
+              type="date"
+              value={draft.endsAt.slice(0, 10)}
+              onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <div>
             <Label>Utilisations max</Label>
-            <Input type="number" value={draft.maxUses} onChange={(e) => setDraft({ ...draft, maxUses: Number(e.target.value) })} className="mt-1.5 rounded-none" />
+            <Input
+              type="number"
+              value={draft.maxUses}
+              onChange={(e) => setDraft({ ...draft, maxUses: Number(e.target.value) })}
+              className="mt-1.5 rounded-none"
+            />
           </div>
           <label className="mt-6 flex items-center gap-2 text-sm">
             <input
@@ -849,35 +925,69 @@ function ContentTab() {
         <h2 className="font-display text-xl sm:col-span-2">Bannière & coordonnées</h2>
         <div>
           <Label>Titre bannière</Label>
-          <Input value={draft.bannerTitle} onChange={(e) => setDraft({ ...draft, bannerTitle: e.target.value })} className="mt-1.5 rounded-none" />
+          <Input
+            value={draft.bannerTitle}
+            onChange={(e) => setDraft({ ...draft, bannerTitle: e.target.value })}
+            className="mt-1.5 rounded-none"
+          />
         </div>
         <div>
           <Label>Bouton bannière</Label>
-          <Input value={draft.bannerCta} onChange={(e) => setDraft({ ...draft, bannerCta: e.target.value })} className="mt-1.5 rounded-none" />
+          <Input
+            value={draft.bannerCta}
+            onChange={(e) => setDraft({ ...draft, bannerCta: e.target.value })}
+            className="mt-1.5 rounded-none"
+          />
         </div>
         <div className="sm:col-span-2">
           <Label>Sous-titre</Label>
-          <Textarea value={draft.bannerSubtitle} onChange={(e) => setDraft({ ...draft, bannerSubtitle: e.target.value })} rows={2} className="mt-1.5 rounded-none" />
+          <Textarea
+            value={draft.bannerSubtitle}
+            onChange={(e) => setDraft({ ...draft, bannerSubtitle: e.target.value })}
+            rows={2}
+            className="mt-1.5 rounded-none"
+          />
         </div>
         <div>
           <Label>WhatsApp (indicatif inclus)</Label>
-          <Input value={draft.whatsapp} onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} className="mt-1.5 rounded-none" />
+          <Input
+            value={draft.whatsapp}
+            onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })}
+            className="mt-1.5 rounded-none"
+          />
         </div>
         <div>
           <Label>Téléphone</Label>
-          <Input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} className="mt-1.5 rounded-none" />
+          <Input
+            value={draft.phone}
+            onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
+            className="mt-1.5 rounded-none"
+          />
         </div>
         <div>
           <Label>Email</Label>
-          <Input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} className="mt-1.5 rounded-none" />
+          <Input
+            value={draft.email}
+            onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+            className="mt-1.5 rounded-none"
+          />
         </div>
         <div>
           <Label>Adresse</Label>
-          <Input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} className="mt-1.5 rounded-none" />
+          <Input
+            value={draft.address}
+            onChange={(e) => setDraft({ ...draft, address: e.target.value })}
+            className="mt-1.5 rounded-none"
+          />
         </div>
         <div>
           <Label>Livraison offerte à partir de (FCFA)</Label>
-          <Input type="number" value={draft.freeShippingFrom} onChange={(e) => setDraft({ ...draft, freeShippingFrom: Number(e.target.value) })} className="mt-1.5 rounded-none" />
+          <Input
+            type="number"
+            value={draft.freeShippingFrom}
+            onChange={(e) => setDraft({ ...draft, freeShippingFrom: Number(e.target.value) })}
+            className="mt-1.5 rounded-none"
+          />
         </div>
       </section>
 
@@ -888,7 +998,9 @@ function ContentTab() {
             <Label className="capitalize">{key}</Label>
             <Textarea
               value={draft.pages[key]}
-              onChange={(e) => setDraft({ ...draft, pages: { ...draft.pages, [key]: e.target.value } })}
+              onChange={(e) =>
+                setDraft({ ...draft, pages: { ...draft.pages, [key]: e.target.value } })
+              }
               rows={4}
               className="mt-1.5 rounded-none"
             />
@@ -905,7 +1017,6 @@ function ContentTab() {
       >
         Enregistrer le contenu
       </button>
-
     </div>
   );
 }
@@ -1050,7 +1161,10 @@ function Delivery() {
                   className="mt-1.5 h-9 w-32 rounded-none"
                 />
               </div>
-              <button type="submit" className="bg-primary px-5 py-2 text-sm text-primary-foreground">
+              <button
+                type="submit"
+                className="bg-primary px-5 py-2 text-sm text-primary-foreground"
+              >
                 Ajouter le quartier
               </button>
             </form>
@@ -1060,7 +1174,6 @@ function Delivery() {
     </div>
   );
 }
-
 
 const ADMIN_EMAIL = "admin@decorek.sn";
 const ADMIN_PASSWORD = "password123";
@@ -1093,7 +1206,9 @@ function AdminLogin() {
 
         <form onSubmit={onSubmit} className="mt-8 space-y-4">
           <div className="space-y-2">
-            <Label className="label-mono" htmlFor="admin-email">Email</Label>
+            <Label className="label-mono" htmlFor="admin-email">
+              Email
+            </Label>
             <Input
               id="admin-email"
               type="email"
@@ -1105,7 +1220,9 @@ function AdminLogin() {
             />
           </div>
           <div className="space-y-2">
-            <Label className="label-mono" htmlFor="admin-password">Mot de passe</Label>
+            <Label className="label-mono" htmlFor="admin-password">
+              Mot de passe
+            </Label>
             <Input
               id="admin-password"
               type="password"

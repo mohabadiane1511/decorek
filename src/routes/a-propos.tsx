@@ -12,7 +12,10 @@ export const Route = createFileRoute("/a-propos")({
           "Deco'Rek sélectionne vaisselle, décoration et mobilier de réception pour les intérieurs sénégalais.",
       },
       { property: "og:title", content: "À propos de Deco'Rek" },
-      { property: "og:description", content: "Une sélection exigeante pour sublimer vos réceptions." },
+      {
+        property: "og:description",
+        content: "Une sélection exigeante pour sublimer vos réceptions.",
+      },
     ],
   }),
   component: APropos,
@@ -28,7 +31,11 @@ function APropos() {
         <p className="leading-relaxed text-muted-foreground">{content.pages.apropos}</p>
         {cover && (
           <div className="aspect-[4/3] overflow-hidden bg-sand">
-            <img src={cover.images[0]} alt="Sélection Deco'Rek" className="h-full w-full object-cover" />
+            <img
+              src={cover.images[0]}
+              alt="Sélection Deco'Rek"
+              className="h-full w-full object-cover"
+            />
           </div>
         )}
       </div>

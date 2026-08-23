@@ -33,7 +33,10 @@ export function Footer() {
                 placeholder="prenom@email.com"
                 className="w-full border-b border-background/40 bg-transparent pb-3 text-lg placeholder:text-background/40 focus:border-background focus:outline-none"
               />
-              <button type="submit" className="btn-square border-background text-background hover:bg-background hover:text-foreground">
+              <button
+                type="submit"
+                className="btn-square border-background text-background hover:bg-background hover:text-foreground"
+              >
                 S'inscrire
               </button>
             </div>

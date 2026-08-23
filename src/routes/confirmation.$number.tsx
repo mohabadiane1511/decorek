@@ -8,7 +8,10 @@ export const Route = createFileRoute("/confirmation/$number")({
   head: () => ({
     meta: [
       { title: "Commande confirmée | Deco'Rek" },
-      { name: "description", content: "Votre commande Deco'Rek est enregistrée. Paiement à la livraison." },
+      {
+        name: "description",
+        content: "Votre commande Deco'Rek est enregistrée. Paiement à la livraison.",
+      },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Commande confirmée — Deco'Rek" },
       { property: "og:description", content: "Merci pour votre commande." },
@@ -28,8 +31,8 @@ function Confirmation() {
         <CheckCircle2 className="mx-auto h-12 w-12 text-orange-brand" strokeWidth={1.25} />
         <h1 className="mt-6 title-lg">Merci, votre commande est validée</h1>
         <p className="mt-3 text-muted-foreground">
-          Commande <span className="text-foreground">{number}</span>. Notre équipe vous appelle
-          pour confirmer la livraison. Vous réglerez à la réception.
+          Commande <span className="text-foreground">{number}</span>. Notre équipe vous appelle pour
+          confirmer la livraison. Vous réglerez à la réception.
         </p>
 
         {order && (
@@ -70,10 +73,7 @@ function Confirmation() {
         )}
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link
-            to="/suivi"
-            className="btn-square btn-solid"
-          >
+          <Link to="/suivi" className="btn-square btn-solid">
             Suivre ma commande
           </Link>
           <a

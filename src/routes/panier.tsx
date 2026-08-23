@@ -34,10 +34,7 @@ function Panier() {
           <p className="mt-3 text-muted-foreground">
             Parcourez la boutique pour composer votre table.
           </p>
-          <Link
-            to="/boutique"
-            className="btn-square btn-solid mt-8"
-          >
+          <Link to="/boutique" className="btn-square btn-solid mt-8">
             Voir la boutique
           </Link>
         </div>
@@ -113,10 +110,7 @@ function Panier() {
           <p className="mt-4 text-xs text-muted-foreground">
             Livraison offerte à partir de {formatFcfa(content.freeShippingFrom)} d'achat.
           </p>
-          <Link
-            to="/commande"
-            className="btn-square btn-solid mt-6 w-full"
-          >
+          <Link to="/commande" className="btn-square btn-solid mt-6 w-full">
             Passer la commande
           </Link>
           <Link
