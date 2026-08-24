@@ -30,6 +30,8 @@ type State = {
   regions: DeliveryRegion[];
   content: SiteContent;
   cart: CartLine[];
+  /** Identifiants des produits mis de côté. */
+  favoris: string[];
   user: SessionUser | null;
 };
 
@@ -43,14 +45,20 @@ const initialState: State = {
   regions: [],
   content: seedContent,
   cart: [],
+  favoris: [],
   user: null,
 };
 
-// Seul le panier est persisté. Le catalogue viendrait périmé, et la session vit
-// désormais dans un cookie httpOnly que le navigateur ne peut pas lire.
-const STORAGE_KEY = "decorek-panier-v2";
+// Panier et favoris sont conservés dans le navigateur. Le catalogue viendrait périmé,
+// et la session vit dans un cookie httpOnly que le navigateur ne peut pas lire.
+//
+// Les favoris restent locaux plutôt que liés au compte : les rattacher à un compte
+// obligerait à s'inscrire pour mettre un article de côté, ce qui est justement le
+// geste qu'on fait avant d'être décidé. La contrepartie est qu'ils ne suivent pas
+// d'un appareil à l'autre — acceptable pour une liste d'envies, pas pour un achat.
+const STORAGE_KEY = "decorek-preferences-v1";
 
-type EtatPersiste = Pick<State, "cart">;
+type EtatPersiste = Pick<State, "cart" | "favoris">;
 
 type StoreValue = State & {
   ready: boolean;
@@ -63,6 +71,9 @@ type StoreValue = State & {
   clearCart: () => void;
   cartCount: number;
   cartSubtotal: number;
+  /** Ajoute ou retire un article des favoris. */
+  basculerFavori: (productId: string) => void;
+  estFavori: (productId: string) => boolean;
   /** Connexion réelle : la session vit dans un cookie posé par le serveur. */
   signIn: (email: string, motDePasse: string) => Promise<void>;
   inscrire: (nom: string, email: string, motDePasse: string) => Promise<void>;
@@ -106,7 +117,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const brut = window.localStorage.getItem(STORAGE_KEY);
       if (brut) {
         const persiste = JSON.parse(brut) as Partial<EtatPersiste>;
-        setState((s) => ({ ...s, cart: persiste.cart ?? s.cart }));
+        setState((s) => ({
+          ...s,
+          cart: persiste.cart ?? s.cart,
+          favoris: persiste.favoris ?? s.favoris,
+        }));
       }
     } catch {
       /* panier illisible : on repart d'un panier vide plutôt que de bloquer le site */
@@ -114,13 +129,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const persiste: EtatPersiste = { cart: state.cart };
+    const persiste: EtatPersiste = { cart: state.cart, favoris: state.favoris };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persiste));
     } catch {
       /* quota indisponible */
     }
-  }, [state.cart]);
+  }, [state.cart, state.favoris]);
 
   // Chargement du catalogue depuis l'API. Volontairement côté client : le rendu serveur
   // n'a pas d'adresse d'API à interroger, et les données publiques n'ont pas besoin
@@ -191,6 +206,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       rafraichir,
       cartCount: state.cart.reduce((n, l) => n + l.quantity, 0),
       cartSubtotal,
+      basculerFavori: (productId) =>
+        patch((s) => ({
+          ...s,
+          favoris: s.favoris.includes(productId)
+            ? s.favoris.filter((id) => id !== productId)
+            : [productId, ...s.favoris],
+        })),
+      estFavori: (productId) => state.favoris.includes(productId),
       addToCart: (productId, quantity = 1) =>
         patch((s) => {
           const existing = s.cart.find((l) => l.productId === productId);

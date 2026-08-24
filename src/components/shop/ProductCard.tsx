@@ -1,16 +1,18 @@
 import { Link } from "@tanstack/react-router";
+import { Heart } from "lucide-react";
 import type { Product } from "@/data/types";
 import { formatFcfa } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 
 export function ProductCard({ product }: { product: Product }) {
-  const { addToCart, categories } = useStore();
+  const { addToCart, categories, basculerFavori, estFavori } = useStore();
+  const favori = estFavori(product.id);
   const category = categories.find((c) => c.id === product.categoryId);
   const soldOut = product.stock === 0;
 
   return (
-    <article className="group flex h-full flex-col">
+    <article className="group relative flex h-full flex-col">
       <Link
         to="/produit/$slug"
         params={{ slug: product.slug }}
@@ -34,7 +36,27 @@ export function ProductCard({ product }: { product: Product }) {
             <span className="label-mono bg-background px-2 py-1 text-foreground">Épuisé</span>
           )}
         </div>
+        {/* Hors du lien : imbriquer un bouton dans un lien empêche de cliquer l'un
+            sans déclencher l'autre. */}
       </Link>
+
+      <button
+        type="button"
+        onClick={() => {
+          basculerFavori(product.id);
+          toast.success(favori ? "Retiré de vos favoris" : "Ajouté à vos favoris");
+        }}
+        aria-pressed={favori}
+        aria-label={
+          favori ? `Retirer ${product.name} des favoris` : `Ajouter ${product.name} aux favoris`
+        }
+        className="absolute top-3 right-3 grid h-9 w-9 place-items-center bg-background/90 transition-colors hover:bg-background"
+      >
+        <Heart
+          className={`h-4 w-4 ${favori ? "fill-orange-brand text-orange-brand" : "text-foreground"}`}
+          strokeWidth={1.5}
+        />
+      </button>
 
       <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="label-mono min-w-0 truncate text-muted-foreground">

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Menu, ShoppingBag, User, X } from "lucide-react";
+import { Heart, Menu, ShoppingBag, User, X } from "lucide-react";
 import { useState } from "react";
 const logo = "/images/logo-decorek.png";
 import { useStore } from "@/lib/store";
@@ -12,7 +12,7 @@ const links = [
 ] as const;
 
 export function Header() {
-  const { cartCount } = useStore();
+  const { cartCount, favoris } = useStore();
   const [open, setOpen] = useState(false);
   const [barVisible, setBarVisible] = useState(true);
 
@@ -78,6 +78,18 @@ export function Header() {
               aria-label="Mon compte"
             >
               <User className="h-5 w-5" strokeWidth={1.4} />
+            </Link>
+            <Link
+              to="/favoris"
+              className="relative grid h-10 w-10 place-items-center transition-colors hover:bg-muted"
+              aria-label={favoris.length > 0 ? `Favoris (${favoris.length})` : "Favoris"}
+            >
+              <Heart className="h-5 w-5" strokeWidth={1.4} />
+              {favoris.length > 0 && (
+                <span className="absolute top-1 right-0.5 grid h-4 min-w-4 place-items-center bg-foreground px-1 font-mono text-[10px] text-background">
+                  {favoris.length}
+                </span>
+              )}
             </Link>
             <Link
               to="/panier"

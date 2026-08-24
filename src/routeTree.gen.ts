@@ -17,6 +17,7 @@ import { Route as CgvRouteImport } from './routes/cgv'
 import { Route as CommandeRouteImport } from './routes/commande'
 import { Route as CompteRouteImport } from './routes/compte'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as FavorisRouteImport } from './routes/favoris'
 import { Route as LivraisonRouteImport } from './routes/livraison'
 import { Route as PanierRouteImport } from './routes/panier'
 import { Route as SuiviRouteImport } from './routes/suivi'
@@ -63,6 +64,11 @@ const ContactRoute = ContactRouteImport.update({
   path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FavorisRoute = FavorisRouteImport.update({
+  id: '/favoris',
+  path: '/favoris',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LivraisonRoute = LivraisonRouteImport.update({
   id: '/livraison',
   path: '/livraison',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/commande': typeof CommandeRoute
   '/compte': typeof CompteRoute
   '/contact': typeof ContactRoute
+  '/favoris': typeof FavorisRoute
   '/livraison': typeof LivraisonRoute
   '/panier': typeof PanierRoute
   '/suivi': typeof SuiviRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/commande': typeof CommandeRoute
   '/compte': typeof CompteRoute
   '/contact': typeof ContactRoute
+  '/favoris': typeof FavorisRoute
   '/livraison': typeof LivraisonRoute
   '/panier': typeof PanierRoute
   '/suivi': typeof SuiviRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/commande': typeof CommandeRoute
   '/compte': typeof CompteRoute
   '/contact': typeof ContactRoute
+  '/favoris': typeof FavorisRoute
   '/livraison': typeof LivraisonRoute
   '/panier': typeof PanierRoute
   '/suivi': typeof SuiviRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/commande'
     | '/compte'
     | '/contact'
+    | '/favoris'
     | '/livraison'
     | '/panier'
     | '/suivi'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/commande'
     | '/compte'
     | '/contact'
+    | '/favoris'
     | '/livraison'
     | '/panier'
     | '/suivi'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/commande'
     | '/compte'
     | '/contact'
+    | '/favoris'
     | '/livraison'
     | '/panier'
     | '/suivi'
@@ -192,6 +204,7 @@ export interface RootRouteChildren {
   CommandeRoute: typeof CommandeRoute
   CompteRoute: typeof CompteRoute
   ContactRoute: typeof ContactRoute
+  FavorisRoute: typeof FavorisRoute
   LivraisonRoute: typeof LivraisonRoute
   PanierRoute: typeof PanierRoute
   SuiviRoute: typeof SuiviRoute
@@ -257,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/favoris': {
+      id: '/favoris'
+      path: '/favoris'
+      fullPath: '/favoris'
+      preLoaderRoute: typeof FavorisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/livraison': {
       id: '/livraison'
       path: '/livraison'
@@ -304,6 +324,7 @@ const rootRouteChildren: RootRouteChildren = {
   CommandeRoute: CommandeRoute,
   CompteRoute: CompteRoute,
   ContactRoute: ContactRoute,
+  FavorisRoute: FavorisRoute,
   LivraisonRoute: LivraisonRoute,
   PanierRoute: PanierRoute,
   SuiviRoute: SuiviRoute,
