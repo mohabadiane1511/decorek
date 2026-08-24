@@ -419,6 +419,12 @@ function Products() {
       toast.error("Nom et catégorie obligatoires.");
       return;
     }
+    // La base refuse un prix barré inférieur ou égal au prix de vente : autant le dire
+    // ici plutôt que de laisser partir une requête vouée à l'échec.
+    if (draft.oldPrice !== undefined && draft.oldPrice <= draft.price) {
+      toast.error("Le prix barré doit être supérieur au prix de vente.");
+      return;
+    }
     void enregistrer(
       () => saveProduct({ ...draft, slug: slugify(draft.name) }),
       "Produit enregistré",
@@ -469,6 +475,35 @@ function Products() {
               onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })}
               className="mt-1.5 rounded-none"
             />
+          </div>
+          <div>
+            <Label htmlFor="prix-barre">Prix barré (facultatif)</Label>
+            <Input
+              id="prix-barre"
+              type="number"
+              placeholder="Laisser vide si pas de promotion"
+              value={draft.oldPrice ?? ""}
+              onChange={(e) => {
+                const saisie = e.target.value.trim();
+                // Champ vidé : on retire la promotion plutôt que d'enregistrer un zéro,
+                // qui serait refusé par la règle « prix barré supérieur au prix ».
+                setDraft({
+                  ...draft,
+                  ...(saisie === "" ? { oldPrice: undefined } : { oldPrice: Number(saisie) }),
+                });
+              }}
+              className="mt-1.5 rounded-none"
+            />
+            {draft.oldPrice !== undefined && draft.oldPrice <= draft.price ? (
+              <p className="mt-1.5 text-xs text-destructive">
+                Le prix barré doit être supérieur au prix de vente, sinon la promotion annoncerait
+                une hausse.
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Renseigné, il affiche le badge « Promo » et barre l'ancien prix en boutique.
+              </p>
+            )}
           </div>
           <div>
             <Label>Stock</Label>

@@ -116,3 +116,37 @@ test("l'onglet Commandes affiche une commande réelle", async ({ page }) => {
   await expect(page.getByText("Awa Diop").first()).toBeVisible();
   await expect(page.getByText(/Almadies/).first()).toBeVisible();
 });
+
+test("un prix barré déclenche le badge Promo en boutique", async ({ page }) => {
+  await ouvrirBackOffice(page, "promo");
+  await page.getByRole("button", { name: "Produits" }).click();
+  await page.getByRole("button", { name: "Modifier" }).first().click();
+
+  await page.getByLabel("Prix (FCFA)").fill("8000");
+  await page.getByLabel("Prix barré (facultatif)").fill("12000");
+  await page.getByRole("button", { name: /Enregistrer/ }).click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  await page.goto("/boutique");
+  // Le badge et l'ancien prix barré apparaissent ensemble.
+  await expect(page.getByText("Promo").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/12 000 FCFA/).first()).toBeVisible();
+});
+
+test("un prix barré sous le prix de vente est refusé", async ({ page }) => {
+  await ouvrirBackOffice(page, "promo-invalide");
+  await page.getByRole("button", { name: "Produits" }).click();
+  await page.getByRole("button", { name: "Modifier" }).first().click();
+
+  await page.getByLabel("Prix (FCFA)").fill("10000");
+  await page.getByLabel("Prix barré (facultatif)").fill("8000");
+
+  // Signalé pendant la saisie : une « promotion » qui annonce une hausse tromperait
+  // la cliente.
+  await expect(page.getByText(/doit être supérieur au prix de vente/i).first()).toBeVisible();
+
+  await page.getByRole("button", { name: /Enregistrer/ }).click();
+  await expect(page.locator("[data-sonner-toast]")).toContainText(/supérieur/i, {
+    timeout: 15_000,
+  });
+});
