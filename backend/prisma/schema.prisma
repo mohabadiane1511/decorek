@@ -254,20 +254,83 @@ enum Role {
   @@map("role")
 }
 
-// Structure volontairement minimale : l'authentification arrive au lot 10 avec Better
-// Auth, qui apportera ses propres tables de sessions et de comptes.
+// Les champs emailVerified et image sont imposés par Better Auth. Les noms de modèles
+// (User, Session, Account, Verification) le sont aussi : l'adaptateur Prisma les
+// résout par leur nom, les @map ne concernant que les colonnes en base.
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  emailVerified Boolean  @default(false) @map("email_verified")
+  image         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   roles       UserRole[]
   orders      Order[]
   redemptions PromoRedemption[]
+  sessions    Session[]
+  accounts    Account[]
 
   @@map("users")
+}
+
+// Sessions également conservées en base, alors que Redis les sert au quotidien : un
+// vidage du cache ne doit pas déconnecter toute la clientèle.
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// Un compte par moyen de connexion : mot de passe, Google, lien magique. Le mot de
+// passe haché vit ici et jamais sur l'utilisateur.
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String    @map("user_id")
+  issuer                String    @default("credential")
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  idToken               String?   @map("id_token")
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([issuer, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+// Jetons à usage unique : vérification d'adresse, lien magique, réinitialisation.
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verifications")
 }
 
 // Rôles dans leur propre table, jamais en colonne sur `users` : c'est la consigne de la

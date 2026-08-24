@@ -40,6 +40,7 @@ describe("contrôle de santé", () => {
       prisma: prismaCasse,
       cache: contexte.cache,
       redis: contexte.redis,
+      auth: contexte.auth,
     });
 
     const reponse = await appCassee.request("/api/health");
@@ -105,6 +106,7 @@ describe("routes de diagnostic", () => {
       prisma,
       cache: contexte.cache,
       redis: contexte.redis,
+      auth: contexte.auth,
     });
 
     for (const route of [

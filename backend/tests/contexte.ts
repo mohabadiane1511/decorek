@@ -1,6 +1,7 @@
 import { Redis } from "ioredis";
 import type { Hono } from "hono";
 import { creerApp } from "../src/app.js";
+import { creerAuth, type Auth } from "../src/auth.js";
 import { creerCache, type Cache } from "../src/cache.js";
 import { lireConfig } from "../src/config.js";
 import { creerClient } from "../src/db.js";
@@ -8,6 +9,7 @@ import type { PrismaClient } from "../src/generated/prisma/client.js";
 
 export type ContexteTest = {
   app: Hono;
+  auth: Auth;
   prisma: PrismaClient;
   cache: Cache;
   redis: Redis;
@@ -42,8 +44,11 @@ export function creerContexte(env: NodeJS.ProcessEnv = process.env): ContexteTes
     REDIS_URL: redisUrl,
   });
 
+  const auth = creerAuth(prisma, redis, config);
+
   return {
-    app: creerApp({ config, prisma, cache, redis }),
+    app: creerApp({ config, prisma, cache, redis, auth }),
+    auth,
     prisma,
     cache,
     redis,

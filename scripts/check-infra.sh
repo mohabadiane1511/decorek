@@ -68,6 +68,14 @@ else
   rate "api : contrôle de santé en échec (${sante:-aucune réponse})"
 fi
 
+# L'administration doit refuser un visiteur sans session, en toutes circonstances.
+if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+      "http://localhost:${API_PORT:-53000}/api/admin/verification")" = "401" ]; then
+  ok "api : administration fermée sans session"
+else
+  rate "api : administration ACCESSIBLE sans session"
+fi
+
 # Les routes de diagnostic doivent rester absentes de l'image de production.
 if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
       "http://localhost:${API_PORT:-53000}/api/_diag/boom")" = "404" ]; then

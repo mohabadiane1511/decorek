@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { config as loadEnv } from "dotenv";
 import { Redis } from "ioredis";
 import { creerApp } from "./app.js";
+import { creerAuth } from "./auth.js";
 import { creerCache } from "./cache.js";
 import { lireConfig } from "./config.js";
 import { creerClient } from "./db.js";
@@ -18,7 +19,8 @@ redis.on("error", () => {
   // Journalisé par le cache : inutile de doubler le bruit. Sans écouteur, ioredis
   // ferait tomber le processus sur une erreur de connexion.
 });
-const app = creerApp({ config, prisma, cache, redis });
+const auth = creerAuth(prisma, redis, config);
+const app = creerApp({ config, prisma, cache, redis, auth });
 
 const serveur = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   console.log(`API Deco'Rek à l'écoute sur le port ${info.port} (${config.NODE_ENV})`);

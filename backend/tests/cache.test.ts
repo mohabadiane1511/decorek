@@ -107,7 +107,13 @@ describe("panne du cache", () => {
       DATABASE_URL: urlBase,
       REDIS_URL: urlCache,
     });
-    const app = creerApp({ config, prisma: contexte.prisma, cache: cacheMort, redis: redisMort });
+    const app = creerApp({
+      config,
+      prisma: contexte.prisma,
+      cache: cacheMort,
+      redis: redisMort,
+      auth: contexte.auth,
+    });
 
     try {
       const reponse = await app.request("/api/produits");

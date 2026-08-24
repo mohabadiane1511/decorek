@@ -4,6 +4,8 @@ import { requestId } from "hono/request-id";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import type { Redis } from "ioredis";
+import type { Auth } from "./auth.js";
+import { exigerAdmin, lireSession } from "./auth-middleware.js";
 import type { Cache } from "./cache.js";
 import type { Config } from "./config.js";
 import { limiter } from "./limite.js";
@@ -17,9 +19,10 @@ export type Dependances = {
   prisma: PrismaClient;
   cache: Cache;
   redis: Redis;
+  auth: Auth;
 };
 
-export function creerApp({ config, prisma, cache, redis }: Dependances): Hono {
+export function creerApp({ config, prisma, cache, redis, auth }: Dependances): Hono {
   const app = new Hono();
 
   app.use("*", requestId());
@@ -42,6 +45,31 @@ export function creerApp({ config, prisma, cache, redis }: Dependances): Hono {
     }
     return c.json({ status: "ok" as const, database: "ok" as const });
   });
+
+  // Connexion et création de compte sont limitées en débit : sans cela, essayer des
+  // mots de passe en masse ne coûte rien à l'attaquant.
+  app.on(
+    ["POST"],
+    ["/api/auth/sign-in/*", "/api/auth/sign-up/*", "/api/auth/forget-password"],
+    limiter(redis, "auth", { max: 10, fenetreSecondes: 60 }),
+  );
+  app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+  // Session courante, telle que le front doit la voir : identité et rôle, rien de plus.
+  app.get("/api/moi", async (c) => {
+    const session = await lireSession(auth, prisma, c);
+    if (!session) return c.json({ utilisateur: null });
+    return c.json({
+      utilisateur: {
+        name: session.name,
+        email: session.email,
+        isAdmin: session.estAdmin,
+      },
+    });
+  });
+
+  // Sonde du contrôle d'accès, utilisée par les tests et par check-infra.
+  app.get("/api/admin/verification", exigerAdmin(auth, prisma), (c) => c.json({ ok: true }));
 
   app.route("/api", routesCatalogue(prisma, cache));
   app.route("/api", routesContenu(prisma, cache));
