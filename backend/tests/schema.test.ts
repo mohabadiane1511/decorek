@@ -210,7 +210,7 @@ describe("intégrité référentielle", () => {
 });
 
 describe("mouvements de stock", () => {
-  it("empêche de rejouer deux fois le même mouvement pour une commande", async () => {
+  it("accepte plusieurs mouvements de même motif pour une commande", async () => {
     const c = await creerCategorie();
     const p = await creerProduit(c.id);
     const o = await creerCommande();
@@ -221,9 +221,19 @@ describe("mouvements de stock", () => {
       reason: "annulation" as const,
     };
 
+    // Une commande peut être annulée, réactivée, puis annulée à nouveau : deux
+    // mouvements d'annulation sont alors légitimes. La protection contre la double
+    // restauration ne vient donc pas d'une contrainte d'unicité, qui interdirait ce
+    // cycle, mais de la réconciliation calculée depuis la somme du journal — voir
+    // src/stock.ts et les tests d'administration.
     await prisma.stockMovement.create({ data: mouvement });
-    // Sans ce filet, annuler deux fois la même commande créditerait le stock deux fois.
-    await expect(prisma.stockMovement.create({ data: mouvement })).rejects.toThrow();
+    await expect(prisma.stockMovement.create({ data: mouvement })).resolves.toBeTruthy();
+
+    const total = await prisma.stockMovement.aggregate({
+      where: { orderId: o.id },
+      _sum: { delta: true },
+    });
+    expect(total._sum.delta).toBe(6);
   });
 
   it("refuse un mouvement de stock nul", async () => {

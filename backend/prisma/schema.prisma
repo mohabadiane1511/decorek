@@ -194,9 +194,12 @@ model StockMovement {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
-  // Un même couple commande/produit ne peut être joué qu'une fois par motif : filet
-  // en base contre une annulation appliquée deux fois.
-  @@unique([orderId, productId, reason])
+  // Pas de contrainte d'unicité : une commande peut être annulée, réactivée, puis
+  // annulée à nouveau, ce qui produit légitimement plusieurs mouvements de même motif.
+  // La protection contre la double restauration vient de la réconciliation faite dans
+  // le code (voir src/stock.ts) : l'état visé est calculé depuis la somme du journal,
+  // si bien que rejouer une opération ne produit aucun mouvement.
+  @@index([orderId])
   @@index([productId])
   @@map("stock_movements")
 }
