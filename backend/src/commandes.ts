@@ -1,4 +1,5 @@
 import type { Order, OrderItem } from "../../src/data/types.js";
+import { versCommande } from "./conversions.js";
 import { ErreurApi } from "./erreurs.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 
@@ -235,31 +236,6 @@ export async function creerCommande(
       });
     }
 
-    return {
-      id: commande.id,
-      number: commande.number,
-      createdAt: commande.createdAt.toISOString(),
-      customer: {
-        name: commande.customerName,
-        phone: commande.customerPhone,
-        email: commande.customerEmail ?? undefined,
-      },
-      delivery: {
-        regionId: commande.regionId ?? "",
-        regionName: commande.regionName,
-        areaName: commande.areaName,
-        address: commande.address,
-        fee: commande.deliveryFee,
-        note: commande.note ?? undefined,
-      },
-      items: lignes,
-      subtotal: commande.subtotal,
-      discount: commande.discount,
-      promoCode: commande.promoCode ?? undefined,
-      total: commande.total,
-      status: commande.status,
-      paid: commande.paid,
-      userEmail: demande.customer.email ?? undefined,
-    } satisfies Order;
+    return versCommande({ ...commande, items: lignes });
   });
 }

@@ -9,8 +9,14 @@ import { confirmerAdresse } from "./mailpit.js";
  */
 const marque = Date.now();
 
-async function ouvrirBackOffice(page: Page): Promise<void> {
-  const adresse = `patron-${marque}@decorek.sn`;
+/**
+ * Ouvre le back-office avec un compte administrateur propre au test appelant.
+ *
+ * Un compte partagé ne convient pas : les tests s'exécutent en parallèle et créeraient
+ * la même adresse au même instant, ce qui en fait échouer certains au hasard.
+ */
+async function ouvrirBackOffice(page: Page, nom: string): Promise<void> {
+  const adresse = `patron-${nom}-${marque}@decorek.sn`;
 
   await page.goto("/compte");
   await page.getByRole("button", { name: "Créer un compte" }).click();
@@ -21,11 +27,13 @@ async function ouvrirBackOffice(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Créer mon compte" }).click();
   await confirmerAdresse(page, adresse);
 
-  // Le rôle ne s'obtient que côté serveur : on passe par la commande dédiée.
+  // Le rôle ne s'obtient que côté serveur : on passe par la commande dédiée, dirigée
+  // vers la base de test — c'est là que le compte vient d'être créé.
   const { execFileSync } = await import("node:child_process");
-  execFileSync("npm", ["run", "db:admin", "--", adresse], {
+  execFileSync("npm", ["run", "--prefix", "backend", "db:admin", "--", adresse], {
     cwd: new URL("..", import.meta.url).pathname,
     stdio: "pipe",
+    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "" },
   });
 
   await page.goto("/admin");
@@ -33,7 +41,7 @@ async function ouvrirBackOffice(page: Page): Promise<void> {
 }
 
 test("le back-office s'ouvre et affiche les données réelles", async ({ page }) => {
-  await ouvrirBackOffice(page);
+  await ouvrirBackOffice(page, "onglets");
 
   // Les huit onglets doivent être là.
   for (const onglet of [
@@ -55,7 +63,7 @@ test("le back-office s'ouvre et affiche les données réelles", async ({ page })
 });
 
 test("une modification de prix est enregistrée et visible en boutique", async ({ page }) => {
-  await ouvrirBackOffice(page);
+  await ouvrirBackOffice(page, "prix");
   await page.getByRole("button", { name: "Produits" }).click();
 
   await page.getByRole("button", { name: "Modifier" }).first().click();
@@ -71,7 +79,7 @@ test("une modification de prix est enregistrée et visible en boutique", async (
 });
 
 test("le contenu du site modifié apparaît sur la boutique", async ({ page }) => {
-  await ouvrirBackOffice(page);
+  await ouvrirBackOffice(page, "contenu");
   await page.getByRole("button", { name: "Contenu" }).click();
 
   const titre = `Bannière ${marque}`;
@@ -84,4 +92,27 @@ test("le contenu du site modifié apparaît sur la boutique", async ({ page }) =
 
   await page.goto("/contact");
   await expect(page.locator("footer")).toBeVisible();
+});
+
+test("l'onglet Commandes affiche une commande réelle", async ({ page }) => {
+  // Une commande est passée depuis la boutique avant d'ouvrir le back-office : c'est
+  // ce cas — un onglet avec des données — qui manquait aux tests, et c'est
+  // exactement là que la page échouait.
+  await page.goto("/produit/sous-assiette-solaire-doree");
+  await page.getByRole("button", { name: "Ajouter au panier" }).first().click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 10_000 });
+
+  await page.goto("/commande");
+  await page.getByLabel("Nom complet *").fill("Awa Diop");
+  await page.getByLabel("Téléphone *").fill("+221 77 123 45 67");
+  await page.getByLabel("Adresse précise *").fill("Route des Almadies, villa 12");
+  await page.getByRole("button", { name: /Valider ma commande/ }).click();
+  await expect(page).toHaveURL(/\/confirmation\//, { timeout: 20_000 });
+
+  await ouvrirBackOffice(page, "commandes");
+  await page.getByRole("button", { name: "Commandes" }).click();
+
+  await expect(page.getByText(/DR-\d{4}-\d{4}/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Awa Diop").first()).toBeVisible();
+  await expect(page.getByText(/Almadies/).first()).toBeVisible();
 });

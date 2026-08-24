@@ -34,3 +34,33 @@ services:
     ports:
       - "127.0.0.1:${MAIL_UI_PORT:-58025}:8025" # interface web de consultation
       - "127.0.0.1:${MAIL_SMTP_PORT:-51025}:1025" # SMTP
+
+  # Seconde instance de l'API, réservée aux tests de bout en bout.
+  #
+  # Elle partage l'image et la configuration, mais pointe sur la base « decorek_test ».
+  # Sans elle, les tests écrivent dans la base de travail : les commandes qu'ils passent
+  # se mêlent aux vraies, et le stock qu'ils consomment est le vrai stock.
+  #
+  # Le cache utilise l'index 2 de Redis, distinct de celui du développement (0) et de
+  # celui des tests d'API (1).
+  api-e2e:
+    extends:
+      file: docker-compose.yml
+      service: api
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/decorek_test?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@cache:6379/2
+      # Le front de test tourne sur son propre port. Better Auth vérifie l'origine des
+      # requêtes et renvoie 403 si elle ne correspond pas à cette adresse.
+      AUTH_URL: http://localhost:${E2E_FRONT_PORT:-8090}
+    ports:
+      - "127.0.0.1:${API_E2E_PORT:-53001}:3000"

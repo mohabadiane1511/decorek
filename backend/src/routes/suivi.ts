@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import type { Order } from "../../../src/data/types.js";
+import { versCommande } from "../conversions.js";
 import type { Auth } from "../auth.js";
 import { lireSession } from "../auth-middleware.js";
 import { ErreurApi, corpsErreur } from "../erreurs.js";
@@ -76,39 +76,9 @@ export function routesSuivi(prisma: PrismaClient, auth: Auth, redis: Redis): Hon
         if (!telephone || !memeTelephone(telephone, commande.customerPhone)) throw refus();
       }
 
-      const suivi: Order = {
-        id: commande.id,
-        number: commande.number,
-        createdAt: commande.createdAt.toISOString(),
-        customer: {
-          name: commande.customerName,
-          phone: commande.customerPhone,
-          email: commande.customerEmail ?? undefined,
-        },
-        delivery: {
-          regionId: commande.regionId ?? "",
-          regionName: commande.regionName,
-          areaName: commande.areaName,
-          address: commande.address,
-          fee: commande.deliveryFee,
-          note: commande.note ?? undefined,
-        },
-        items: commande.items.map((l) => ({
-          productId: l.productId ?? "",
-          name: l.name,
-          price: l.price,
-          quantity: l.quantity,
-          image: l.image,
-        })),
-        subtotal: commande.subtotal,
-        discount: commande.discount,
-        promoCode: commande.promoCode ?? undefined,
-        total: commande.total,
-        status: commande.status,
-        paid: commande.paid,
-        // internalNote reste côté équipe : c'est une note de gestion, pas une
-        // information destinée au client.
-      };
+      // Sans note interne : c'est une donnée de gestion, pas une information
+      // destinée au client.
+      const suivi = versCommande(commande);
 
       // Jamais mis en cache : la réponse porte des données personnelles et doit
       // refléter le statut réel, y compris juste après une mise à jour par l'équipe.

@@ -232,6 +232,42 @@ describe("commandes", () => {
     expect(enBase.internalNote).toBe("Rappeler avant 18h");
   });
 
+  it("renvoie les commandes au format attendu par l'interface", async () => {
+    await commander(2);
+
+    const reponse = await appeler("GET", "/api/admin/commandes", cookieAdmin);
+    const { items } = (await reponse.json()) as { items: Order[] };
+    const commande = items[0]!;
+
+    // La base range ces champs à plat (customerName, deliveryFee) ; l'interface les
+    // lit groupés. Renvoyer la forme brute faisait planter l'onglet Commandes dès
+    // qu'une commande existait — un statut 200 ne suffit donc pas à valider la route.
+    expect(commande.customer.name).toBe("Awa Diop");
+    expect(commande.customer.phone).toBeTruthy();
+    expect(commande.delivery.address).toBeTruthy();
+    expect(commande.delivery.areaName).toBe("Almadies");
+    expect(typeof commande.delivery.fee).toBe("number");
+    expect(commande.items[0]!.name).toBeTruthy();
+    expect(typeof commande.createdAt).toBe("string");
+  });
+
+  it("expose la note interne au back-office, jamais au suivi client", async () => {
+    const commande = await commander(1);
+    await appeler("PATCH", `/api/admin/commandes/${commande.id}`, cookieAdmin, {
+      internalNote: "Rappeler avant 18h",
+    });
+
+    const admin = await appeler("GET", "/api/admin/commandes", cookieAdmin);
+    const { items } = (await admin.json()) as { items: Order[] };
+    expect(items[0]!.internalNote).toBe("Rappeler avant 18h");
+
+    const suivi = await appeler("POST", "/api/commandes/suivi", undefined, {
+      numero: commande.number,
+      telephone: "+221 77 123 45 67",
+    });
+    expect(await suivi.text()).not.toContain("Rappeler avant 18h");
+  });
+
   it("filtre par statut", async () => {
     const a = await commander(1);
     await commander(1);

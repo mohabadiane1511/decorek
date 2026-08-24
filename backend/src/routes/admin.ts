@@ -7,6 +7,7 @@ import type { Cache } from "../cache.js";
 import { ErreurApi, corpsErreur } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { reconcilierStock } from "../stock.js";
+import { versCommande } from "../conversions.js";
 import type { Config } from "../config.js";
 import {
   configStockageDepuis,
@@ -300,7 +301,8 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
       include: { items: true },
       take: 200,
     });
-    return c.json({ items: commandes });
+    // Le back-office voit la note interne, contrairement au suivi client.
+    return c.json({ items: commandes.map((o) => versCommande(o, { avecNoteInterne: true })) });
   });
 
   routes.patch("/admin/commandes/:id", validation(schemaCommande), async (c) => {
@@ -329,7 +331,7 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
     });
 
     await invalider();
-    return c.json(commande);
+    return c.json(versCommande(commande, { avecNoteInterne: true }));
   });
 
   // ---------------------------------------------------------------- Promotions
