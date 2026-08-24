@@ -56,7 +56,14 @@ export function creerApp({ config, prisma, cache, redis, auth }: Dependances): H
   // qui doit en tenter des milliers.
   app.on(
     ["POST"],
-    ["/api/auth/sign-in/*", "/api/auth/sign-up/*", "/api/auth/forget-password"],
+    [
+      "/api/auth/sign-in/*",
+      "/api/auth/sign-up/*",
+      // Ces deux-là déclenchent un envoi d'e-mail : sans plafond, on pourrait s'en
+      // servir pour inonder la boîte de quelqu'un depuis le site.
+      "/api/auth/request-password-reset",
+      "/api/auth/magic-link/*",
+    ],
     limiter(redis, "auth", { max: 20, fenetreSecondes: 60 }),
   );
   app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));

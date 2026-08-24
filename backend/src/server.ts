@@ -4,6 +4,7 @@ import { Redis } from "ioredis";
 import { creerApp } from "./app.js";
 import { creerAuth } from "./auth.js";
 import { creerCache } from "./cache.js";
+import { creerCourrier } from "./mail.js";
 import { lireConfig } from "./config.js";
 import { creerClient } from "./db.js";
 
@@ -19,7 +20,8 @@ redis.on("error", () => {
   // Journalisé par le cache : inutile de doubler le bruit. Sans écouteur, ioredis
   // ferait tomber le processus sur une erreur de connexion.
 });
-const auth = creerAuth(prisma, redis, config);
+const courrier = creerCourrier(config);
+const auth = creerAuth(prisma, redis, config, courrier);
 const app = creerApp({ config, prisma, cache, redis, auth });
 
 const serveur = serve({ fetch: app.fetch, port: config.PORT }, (info) => {

@@ -5,6 +5,7 @@ import { creerAuth, type Auth } from "../src/auth.js";
 import { creerCache, type Cache } from "../src/cache.js";
 import { lireConfig } from "../src/config.js";
 import { creerClient } from "../src/db.js";
+import { creerCourrier } from "../src/mail.js";
 import type { PrismaClient } from "../src/generated/prisma/client.js";
 
 export type ContexteTest = {
@@ -44,7 +45,7 @@ export function creerContexte(env: NodeJS.ProcessEnv = process.env): ContexteTes
     REDIS_URL: redisUrl,
   });
 
-  const auth = creerAuth(prisma, redis, config);
+  const auth = creerAuth(prisma, redis, config, creerCourrier(config));
 
   return {
     app: creerApp({ config, prisma, cache, redis, auth }),

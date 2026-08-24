@@ -1,8 +1,10 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { magicLink } from "better-auth/plugins";
 import type { Redis } from "ioredis";
 import type { Config } from "./config.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
+import { gabarit, type Courrier } from "./mail.js";
 
 /**
  * Authentification réelle, en remplacement du simulacre de la maquette où toute adresse
@@ -12,7 +14,7 @@ import type { PrismaClient } from "./generated/prisma/client.js";
  * requête et applique l'expiration nativement, la base garde la trace et permet à une
  * session de survivre à un vidage du cache.
  */
-export function creerAuth(prisma: PrismaClient, redis: Redis, config: Config) {
+export function creerAuth(prisma: PrismaClient, redis: Redis, config: Config, courrier: Courrier) {
   return betterAuth({
     secret: config.AUTH_SECRET,
     baseURL: config.AUTH_URL,
@@ -27,7 +29,40 @@ export function creerAuth(prisma: PrismaClient, redis: Redis, config: Config) {
       // chose que son propre historique.
       requireEmailVerification: false,
       minPasswordLength: 8,
+      sendResetPassword: async ({ user, url }) => {
+        const { texte, html } = gabarit(
+          "Réinitialisation de votre mot de passe",
+          "Vous avez demandé à changer le mot de passe de votre compte Deco'Rek. Ce lien est valable une heure.",
+          { url, libelle: "Choisir un nouveau mot de passe" },
+        );
+        await courrier.envoyer({
+          a: user.email,
+          sujet: "Réinitialiser votre mot de passe Deco'Rek",
+          texte,
+          html,
+        });
+      },
     },
+
+    plugins: [
+      // Connexion sans mot de passe : utile pour une clientèle qui commande rarement et
+      // oublie ses identifiants entre deux achats.
+      magicLink({
+        sendMagicLink: async ({ email, url }) => {
+          const { texte, html } = gabarit(
+            "Votre lien de connexion",
+            "Cliquez pour accéder à votre espace Deco'Rek. Ce lien est valable quelques minutes et ne fonctionne qu'une fois.",
+            { url, libelle: "Me connecter" },
+          );
+          await courrier.envoyer({
+            a: email,
+            sujet: "Votre lien de connexion Deco'Rek",
+            texte,
+            html,
+          });
+        },
+      }),
+    ],
 
     secondaryStorage: {
       get: async (cle) => redis.get(cle),

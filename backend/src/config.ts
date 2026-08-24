@@ -11,6 +11,18 @@ const schemaConfig = z.object({
   // 32 caractères au minimum, générés aléatoirement (openssl rand -base64 32).
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET doit faire au moins 32 caractères"),
   AUTH_URL: z.string().min(1).default("http://localhost:8080"),
+  // Messagerie. En développement, Mailpit accepte tout sans authentification ; en
+  // production, SMTP_USER et SMTP_PASSWORD deviennent obligatoires côté fournisseur.
+  SMTP_HOST: z.string().min(1).default("localhost"),
+  SMTP_PORT: z.coerce.number().int().positive().default(1025),
+  SMTP_SECURE: z
+    .union([z.boolean(), z.string()])
+    .transform((v) => v === true || v === "true" || v === "1")
+    .default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  MAIL_FROM: z.string().min(1).default("Deco'Rek <contact@decorek.sn>"),
+
   S3_ENDPOINT: z.string().min(1),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),

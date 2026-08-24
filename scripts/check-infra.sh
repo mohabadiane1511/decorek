@@ -17,7 +17,7 @@ ok()   { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 rate() { printf '  \033[31m✗\033[0m %s\n' "$1"; echec=1; }
 
 echo "État des conteneurs"
-for service in db cache storage api; do
+for service in db cache storage mail api; do
   etat=$($COMPOSE ps --format '{{.Health}}' "$service" 2>/dev/null | head -1)
   [ "$etat" = "healthy" ] && ok "$service : $etat" || rate "$service : ${etat:-absent}"
 done
@@ -82,6 +82,13 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
   ok "api : routes de diagnostic absentes"
 else
   rate "api : routes de diagnostic EXPOSÉES"
+fi
+
+echo "Messagerie"
+if curl -s --max-time 10 "http://localhost:${MAIL_UI_PORT:-58025}/api/v1/info" | grep -q .; then
+  ok "mailpit : boîte de développement joignable"
+else
+  rate "mailpit : injoignable"
 fi
 
 echo "Exposition réseau"

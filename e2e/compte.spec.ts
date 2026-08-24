@@ -11,7 +11,8 @@ async function creerCompte(page: Page, compte: { email: string; mdp: string; nom
   await page.getByRole("button", { name: "Créer un compte" }).click();
   await page.getByLabel("Nom complet").fill(compte.nom);
   await page.getByLabel("Email").fill(compte.email);
-  await page.getByLabel("Mot de passe").fill(compte.mdp);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(compte.mdp);
+  await page.getByLabel("Confirmer le mot de passe").fill(compte.mdp);
   await page.getByRole("button", { name: "Créer mon compte" }).click();
   await expect(page.getByText(`Bonjour, ${compte.nom}`)).toBeVisible({ timeout: 15_000 });
 }
@@ -64,4 +65,21 @@ test("des identifiants inconnus affichent un message, pas un plantage", async ({
 
   await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
   await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+});
+
+test("deux mots de passe différents bloquent l'inscription", async ({ page }) => {
+  await page.goto("/compte");
+  await page.getByRole("button", { name: "Créer un compte" }).click();
+  await page.getByLabel("Nom complet").fill("Awa Diop");
+  await page.getByLabel("Email").fill(`frappe-${marque}@test.sn`);
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByLabel("Confirmer le mot de passe").fill("motdepasse124");
+
+  // L'écart est signalé pendant la saisie, avant même de soumettre.
+  await expect(page.getByText(/ne correspondent pas/i).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+  // Une faute de frappe ici enfermerait le client dehors : le compte ne doit pas
+  // être créé, et on reste sur le formulaire.
+  await expect(page.getByRole("heading", { name: "Créer un compte" })).toBeVisible();
 });

@@ -67,7 +67,8 @@ test("un code promo appliqué par un client connecté réduit le total", async (
   await page.getByRole("button", { name: "Créer un compte" }).click();
   await page.getByLabel("Nom complet").fill("Awa Diop");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Mot de passe").fill("motdepasse123");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
   await page.getByRole("button", { name: "Créer mon compte" }).click();
   await expect(page.getByText("Bonjour, Awa Diop")).toBeVisible({ timeout: 15_000 });
 
@@ -92,7 +93,8 @@ test("une remise sous le minimum requis est refusée avec son motif", async ({ p
   await page.getByRole("button", { name: "Créer un compte" }).click();
   await page.getByLabel("Nom complet").fill("Awa Diop");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Mot de passe").fill("motdepasse123");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
   await page.getByRole("button", { name: "Créer mon compte" }).click();
   await expect(page.getByText("Bonjour, Awa Diop")).toBeVisible({ timeout: 15_000 });
 

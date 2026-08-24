@@ -31,6 +31,7 @@ function Compte() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
 
   if (!user) {
     const submit = async (e: React.FormEvent) => {
@@ -40,6 +41,12 @@ function Compte() {
       // partir une requête vouée à l'échec.
       if (!adresse || password.length < 8) {
         toast.error("Adresse e-mail et mot de passe d'au moins 8 caractères requis.");
+        return;
+      }
+      // Une faute de frappe à l'inscription enfermerait le client dehors : il ne
+      // pourrait plus se connecter avec le mot de passe qu'il croit avoir choisi.
+      if (mode === "signup" && password !== confirmation) {
+        toast.error("Les deux mots de passe ne correspondent pas.");
         return;
       }
 
@@ -53,6 +60,7 @@ function Compte() {
           toast.success("Compte créé");
         }
         setPassword("");
+        setConfirmation("");
       } catch (erreur) {
         toast.error(erreur instanceof Error ? erreur.message : "Connexion impossible.");
       } finally {
@@ -94,11 +102,30 @@ function Compte() {
               <Input
                 id="p"
                 type="password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1.5 rounded-none"
               />
             </div>
+            {mode === "signup" && (
+              <div>
+                <Label htmlFor="p2">Confirmer le mot de passe</Label>
+                <Input
+                  id="p2"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmation}
+                  onChange={(e) => setConfirmation(e.target.value)}
+                  className="mt-1.5 rounded-none"
+                />
+                {confirmation.length > 0 && confirmation !== password && (
+                  <p className="mt-1.5 text-xs text-destructive">
+                    Les deux mots de passe ne correspondent pas.
+                  </p>
+                )}
+              </div>
+            )}
             <button
               type="submit"
               disabled={enCours}

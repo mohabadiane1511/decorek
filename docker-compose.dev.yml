@@ -29,3 +29,8 @@ services:
   api:
     ports:
       - "127.0.0.1:${API_PORT:-53000}:3000"
+
+  mail:
+    ports:
+      - "127.0.0.1:${MAIL_UI_PORT:-58025}:8025" # interface web de consultation
+      - "127.0.0.1:${MAIL_SMTP_PORT:-51025}:1025" # SMTP
