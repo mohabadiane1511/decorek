@@ -95,6 +95,14 @@ export type SiteContent = {
   bannerSubtitle: string;
   bannerCta: string;
   whatsapp: string;
+  /**
+   * Réseaux sociaux. Chaîne vide = absent du site : le lien n'est affiché que si la
+   * page existe, plutôt que de mener vers un compte inexistant.
+   */
+  facebook: string;
+  instagram: string;
+  tiktok: string;
+  snapchat: string;
   phone: string;
   email: string;
   address: string;

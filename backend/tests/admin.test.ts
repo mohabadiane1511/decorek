@@ -446,6 +446,36 @@ describe("contenu et livraison", () => {
     expect(contenu.freeShippingFrom).toBe(75000);
   });
 
+  it("enregistre les réseaux sociaux et tolère leur absence", async () => {
+    const base = {
+      bannerTitle: "Titre",
+      bannerSubtitle: "",
+      bannerCta: "Voir",
+      whatsapp: "221770000000",
+      phone: "+221 77 000 00 00",
+      email: "equipe@decorek.sn",
+      address: "Dakar",
+      freeShippingFrom: 100000,
+      pages: { contact: "", livraison: "", apropos: "", cgv: "" },
+    };
+
+    // Sans les champs : accepté, les réseaux restent vides. Les exiger ferait échouer
+    // une requête émise par une version antérieure du front.
+    expect((await appeler("PUT", "/api/admin/contenu", cookieAdmin, base)).status).toBe(200);
+
+    const avec = await appeler("PUT", "/api/admin/contenu", cookieAdmin, {
+      ...base,
+      facebook: "https://facebook.com/decorek",
+      instagram: "https://instagram.com/decorek",
+    });
+    expect(avec.status).toBe(200);
+
+    const publique = await contexte.app.request("/api/contenu");
+    const contenu = (await publique.json()) as { facebook: string; tiktok: string };
+    expect(contenu.facebook).toBe("https://facebook.com/decorek");
+    expect(contenu.tiktok).toBe("");
+  });
+
   it("remplace les zones de livraison", async () => {
     const reponse = await appeler("PUT", "/api/admin/livraison", cookieAdmin, {
       regions: [{ name: "Dakar", areas: [{ name: "Plateau", fee: 1500 }] }],

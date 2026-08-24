@@ -357,6 +357,10 @@ model SiteContent {
   bannerSubtitle   String   @map("banner_subtitle")
   bannerCta        String   @map("banner_cta")
   whatsapp         String
+  facebook         String   @default("")
+  instagram        String   @default("")
+  tiktok           String   @default("")
+  snapchat         String   @default("")
   phone            String
   email            String
   address          String

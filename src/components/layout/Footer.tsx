@@ -1,9 +1,22 @@
 import { Link } from "@tanstack/react-router";
+import { Facebook, Instagram, Music2, Ghost } from "lucide-react";
 const logo = "/images/logo-decorek.png";
 import { useStore } from "@/lib/store";
 
 export function Footer() {
   const { content, categories } = useStore();
+
+  // Lucide n'a pas d'icône Snapchat ni TikTok : on emprunte les plus proches
+  // visuellement, le libellé accessible portant le nom réel du réseau.
+  const reseaux = [
+    { nom: "Facebook", url: content.facebook, Icone: Facebook },
+    { nom: "Instagram", url: content.instagram, Icone: Instagram },
+    { nom: "TikTok", url: content.tiktok, Icone: Music2 },
+    { nom: "Snapchat", url: content.snapchat, Icone: Ghost },
+    // Le champ peut manquer si l'API répond avec une version antérieure — un cache
+    // pas encore périmé, un déploiement en cours. Sans cette prudence, le pied de
+    // page échoue et emporte toute la page avec lui.
+  ].filter((r) => (r.url ?? "").trim().length > 0);
 
   return (
     <footer className="mt-24 bg-foreground text-background">
@@ -100,6 +113,26 @@ export function Footer() {
             <li>{content.phone}</li>
             <li>{content.email}</li>
           </ul>
+
+          {/* Seuls les réseaux renseignés apparaissent : afficher une icône menant
+              vers un compte inexistant vaut moins que ne rien afficher. */}
+          {reseaux.length > 0 && (
+            <div className="mt-6 flex gap-3">
+              {reseaux.map(({ nom, url, Icone }) => (
+                <a
+                  key={nom}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label={nom}
+                  title={nom}
+                  className="grid h-10 w-10 place-items-center border border-background/25 transition-colors hover:bg-background hover:text-foreground"
+                >
+                  <Icone className="h-4 w-4" strokeWidth={1.5} />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

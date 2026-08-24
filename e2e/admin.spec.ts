@@ -150,3 +150,26 @@ test("un prix barré sous le prix de vente est refusé", async ({ page }) => {
     timeout: 15_000,
   });
 });
+
+test("les réseaux sociaux renseignés apparaissent dans le pied de page", async ({ page }) => {
+  await ouvrirBackOffice(page, "reseaux");
+  await page.getByRole("button", { name: "Contenu" }).click();
+
+  await page.getByLabel("Facebook").fill("https://facebook.com/decorek");
+  await page.getByLabel("Instagram").fill("https://instagram.com/decorek");
+  await page
+    .getByRole("button", { name: /Enregistrer/ })
+    .first()
+    .click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  await page.goto("/boutique");
+  const pied = page.locator("footer");
+  await expect(pied.getByRole("link", { name: "Facebook" })).toBeVisible({ timeout: 15_000 });
+  await expect(pied.getByRole("link", { name: "Instagram" })).toBeVisible();
+
+  // Ceux qu'on n'a pas renseignés restent absents : une icône menant vers un compte
+  // inexistant vaut moins que pas d'icône.
+  await expect(pied.getByRole("link", { name: "TikTok" })).toHaveCount(0);
+  await expect(pied.getByRole("link", { name: "Snapchat" })).toHaveCount(0);
+});

@@ -145,8 +145,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...s,
           products: catalogue.items,
           categories,
-          content,
           regions,
+          // Complété par les valeurs de départ : si l'API répond avec une version
+          // antérieure — cache pas encore périmé, déploiement en cours — les champs
+          // manquants ne doivent pas faire échouer l'affichage.
+          content: { ...s.content, ...content },
           user: utilisateur,
         }));
 

@@ -13,6 +13,10 @@ type ContenuEnBase = {
   bannerSubtitle: string;
   bannerCta: string;
   whatsapp: string;
+  facebook: string;
+  instagram: string;
+  tiktok: string;
+  snapchat: string;
   phone: string;
   email: string;
   address: string;
@@ -33,6 +37,10 @@ export function versContenu(c: ContenuEnBase): SiteContent {
     bannerSubtitle: c.bannerSubtitle,
     bannerCta: c.bannerCta,
     whatsapp: c.whatsapp,
+    facebook: c.facebook,
+    instagram: c.instagram,
+    tiktok: c.tiktok,
+    snapchat: c.snapchat,
     phone: c.phone,
     email: c.email,
     address: c.address,

@@ -15,6 +15,7 @@ import { config as chargerEnv } from "dotenv";
 export default function setup(): void {
   const racine = new URL("..", import.meta.url).pathname;
   chargerEnv({ path: `${racine}backend/.env`, quiet: true });
+  const urlTest = process.env["TEST_DATABASE_URL"];
 
   // Remet le catalogue dans son état de référence. Les tests passent de vraies
   // commandes, donc consomment du vrai stock : au bout de quelques exécutions, les
@@ -23,9 +24,22 @@ export default function setup(): void {
   //
   // Le seed procède par mise à jour sur les clés naturelles : il restaure prix et
   // stocks sans toucher aux comptes existants.
+  // Les migrations d'abord : sans elles, une colonne ajoutée depuis la dernière
+  // exécution manque, l'API échoue et des tests sans rapport tombent.
+  if (urlTest) {
+    try {
+      execFileSync("npx", ["prisma", "migrate", "deploy"], {
+        cwd: `${racine}backend`,
+        stdio: "pipe",
+        env: { ...process.env, DATABASE_URL: urlTest },
+      });
+    } catch {
+      // Base absente : les tests le signaleront d'eux-mêmes.
+    }
+  }
+
   // Le seed vise la base de test, jamais celle du développement : les tests ne doivent
   // ni consommer le vrai stock ni mêler leurs commandes aux vraies.
-  const urlTest = process.env["TEST_DATABASE_URL"];
   try {
     execFileSync("npm", ["run", "--prefix", "backend", "db:seed"], {
       cwd: racine,

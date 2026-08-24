@@ -1042,13 +1042,37 @@ function ContentTab() {
           />
         </div>
         <div>
-          <Label>WhatsApp (indicatif inclus)</Label>
+          <Label htmlFor="whatsapp">WhatsApp (indicatif inclus)</Label>
           <Input
+            id="whatsapp"
             value={draft.whatsapp}
             onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })}
             className="mt-1.5 rounded-none"
           />
         </div>
+
+        {/* Réseaux sociaux : adresse complète attendue. Un champ vide retire
+            simplement l'icône du pied de page. */}
+        {(
+          [
+            ["facebook", "Facebook", "https://facebook.com/decorek"],
+            ["instagram", "Instagram", "https://instagram.com/decorek"],
+            ["tiktok", "TikTok", "https://tiktok.com/@decorek"],
+            ["snapchat", "Snapchat", "https://snapchat.com/add/decorek"],
+          ] as const
+        ).map(([cle, libelle, exemple]) => (
+          <div key={cle}>
+            <Label htmlFor={cle}>{libelle}</Label>
+            <Input
+              id={cle}
+              type="url"
+              placeholder={exemple}
+              value={draft[cle]}
+              onChange={(e) => setDraft({ ...draft, [cle]: e.target.value })}
+              className="mt-1.5 rounded-none"
+            />
+          </div>
+        ))}
         <div>
           <Label>Téléphone</Label>
           <Input

@@ -94,6 +94,16 @@ const schemaContenu = z.object({
   bannerSubtitle: z.string().trim().max(500),
   bannerCta: z.string().trim().max(80),
   whatsapp: z.string().trim().max(30),
+  // Adresse complète attendue, ou chaîne vide : un identifiant seul (« @decorek »)
+  // ne permet pas de construire un lien fiable, chaque réseau ayant sa propre forme.
+  //
+  // Facultatifs à dessein : exiger ces champs ferait échouer toute requête émise par
+  // une version antérieure du front — pendant un déploiement, par exemple. L'absence
+  // vaut « pas de réseau », ce que l'interface traduit par une icône en moins.
+  facebook: z.string().trim().max(300).default(""),
+  instagram: z.string().trim().max(300).default(""),
+  tiktok: z.string().trim().max(300).default(""),
+  snapchat: z.string().trim().max(300).default(""),
   phone: z.string().trim().max(30),
   email: z.string().trim().email(),
   address: z.string().trim().max(300),
@@ -443,6 +453,10 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
         bannerSubtitle: d.bannerSubtitle,
         bannerCta: d.bannerCta,
         whatsapp: d.whatsapp,
+        facebook: d.facebook,
+        instagram: d.instagram,
+        tiktok: d.tiktok,
+        snapchat: d.snapchat,
         phone: d.phone,
         email: d.email,
         address: d.address,
