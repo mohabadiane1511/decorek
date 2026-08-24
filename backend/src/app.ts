@@ -48,10 +48,15 @@ export function creerApp({ config, prisma, cache, redis, auth }: Dependances): H
 
   // Connexion et création de compte sont limitées en débit : sans cela, essayer des
   // mots de passe en masse ne coûte rien à l'attaquant.
+  //
+  // Le seuil laisse de la marge parce que la clé est l'adresse IP : au Sénégal, un
+  // cybercafé ou un partage de connexion met plusieurs clients légitimes derrière la
+  // même adresse. Vingt essais par minute les gênent peu et n'aident en rien quelqu'un
+  // qui doit en tenter des milliers.
   app.on(
     ["POST"],
     ["/api/auth/sign-in/*", "/api/auth/sign-up/*", "/api/auth/forget-password"],
-    limiter(redis, "auth", { max: 10, fenetreSecondes: 60 }),
+    limiter(redis, "auth", { max: 20, fenetreSecondes: 60 }),
   );
   app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 

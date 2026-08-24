@@ -199,8 +199,9 @@ describe("protection contre le bourrinage", () => {
   it("finit par répondre 429 sur les tentatives de connexion", async () => {
     await inscrire(CLIENT);
 
+    // Au-delà du plafond de connexion (20 par minute et par adresse).
     const statuts: number[] = [];
-    for (let i = 0; i < 14; i += 1) {
+    for (let i = 0; i < 26; i += 1) {
       const reponse = await connecter({ email: CLIENT.email, password: "mauvais" });
       statuts.push(reponse.status);
     }

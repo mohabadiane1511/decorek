@@ -51,7 +51,10 @@ export type OptionsLimite = {
 
 export function limiter(redis: Redis, nom: string, options: OptionsLimite): MiddlewareHandler {
   return async (c, next) => {
-    // Derrière le proxy, l'adresse réelle arrive dans X-Forwarded-For.
+    // Derrière le proxy, l'adresse réelle arrive dans X-Forwarded-For. S'y fier n'est
+    // sûr que parce que l'API ne publie aucun port : elle n'est joignable que par le
+    // proxy, qui réécrit cet en-tête. Exposer l'API directement rendrait la limitation
+    // contournable en envoyant soi-même l'en-tête.
     const ip =
       c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
       c.req.header("x-real-ip") ??

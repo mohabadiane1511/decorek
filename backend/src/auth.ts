@@ -44,6 +44,12 @@ export function creerAuth(prisma: PrismaClient, redis: Redis, config: Config) {
       increment: async (cle) => redis.incr(cle),
     },
 
+    // Better Auth embarque sa propre limitation de débit, en mémoire du processus et
+    // avec des messages en anglais. On lui préfère celle du lot 8 : partagée via Redis,
+    // donc valable même à plusieurs instances, en fenêtre glissante, et déjà éprouvée.
+    // Deux limiteurs superposés rendraient surtout le diagnostic illisible.
+    rateLimit: { enabled: false },
+
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30 jours
       updateAge: 60 * 60 * 24, // prolongée au plus une fois par jour

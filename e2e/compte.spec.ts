@@ -1,0 +1,67 @@
+import { expect, test, type Page } from "@playwright/test";
+
+// Comptes distincts par exécution : les tests créent de vrais utilisateurs en base.
+const marque = Date.now();
+const CLIENT = { email: `client-${marque}@test.sn`, mdp: "motdepasse123", nom: "Awa Diop" };
+// Adresse qui ouvrait le back-office dans la maquette. Elle ne doit plus rien ouvrir.
+const IMPOSTEUR = { email: `admin-faux-${marque}@test.sn`, mdp: "motdepasse123", nom: "Imposteur" };
+
+async function creerCompte(page: Page, compte: { email: string; mdp: string; nom: string }) {
+  await page.goto("/compte");
+  await page.getByRole("button", { name: "Créer un compte" }).click();
+  await page.getByLabel("Nom complet").fill(compte.nom);
+  await page.getByLabel("Email").fill(compte.email);
+  await page.getByLabel("Mot de passe").fill(compte.mdp);
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await expect(page.getByText(`Bonjour, ${compte.nom}`)).toBeVisible({ timeout: 15_000 });
+}
+
+test("un client crée son compte et voit son espace", async ({ page }) => {
+  await creerCompte(page, CLIENT);
+  await expect(page.getByRole("button", { name: "Se déconnecter" })).toBeVisible();
+  // Un client ordinaire ne se voit jamais proposer le back-office.
+  await expect(page.getByRole("link", { name: "Back-office" })).toHaveCount(0);
+});
+
+test("la déconnexion ferme réellement la session", async ({ page }) => {
+  await creerCompte(page, { ...CLIENT, email: `sortie-${marque}@test.sn` });
+  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
+
+  // Rechargement : la session ne doit pas ressusciter depuis le navigateur.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
+});
+
+test("une adresse commençant par « admin » n'ouvre plus le back-office", async ({ page }) => {
+  await creerCompte(page, IMPOSTEUR);
+
+  await page.goto("/admin");
+  // Le compte est connecté, mais sans rôle : on l'annonce clairement au lieu de
+  // redemander des identifiants.
+  await expect(page.getByRole("heading", { name: "Accès refusé." })).toBeVisible();
+  await expect(page.getByText(IMPOSTEUR.email)).toBeVisible();
+});
+
+test("le back-office est fermé à un visiteur non connecté", async ({ page }) => {
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "Connexion." })).toBeVisible();
+});
+
+test("un mot de passe trop court est refusé avant même l'envoi", async ({ page }) => {
+  await page.goto("/compte");
+  await page.getByLabel("Email").fill("quelquun@test.sn");
+  await page.getByLabel("Mot de passe").fill("court");
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByText(/au moins 8 caractères/i).first()).toBeVisible();
+});
+
+test("des identifiants inconnus affichent un message, pas un plantage", async ({ page }) => {
+  await page.goto("/compte");
+  await page.getByLabel("Email").fill(`inconnu-${marque}@test.sn`);
+  await page.getByLabel("Mot de passe").fill("motdepasse123");
+  await page.getByRole("button", { name: "Se connecter" }).click();
+
+  await expect(page.getByRole("heading", { name: "Connexion" })).toBeVisible();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+});

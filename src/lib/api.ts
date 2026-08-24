@@ -1,4 +1,4 @@
-import type { Category, DeliveryRegion, Product, SiteContent } from "@/data/types";
+import type { Category, DeliveryRegion, Product, SessionUser, SiteContent } from "@/data/types";
 
 /**
  * Client de l'API.
@@ -20,6 +20,41 @@ export class ErreurApi extends Error {
 }
 
 type CorpsErreur = { error?: { code?: string; message?: string } };
+
+async function envoyer<T>(chemin: string, corps: unknown): Promise<T> {
+  let reponse: Response;
+  try {
+    reponse = await fetch(chemin, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(corps),
+      // Indispensable pour que le cookie de session soit émis et renvoyé.
+      credentials: "same-origin",
+    });
+  } catch {
+    throw new ErreurApi("Impossible de joindre la boutique. Vérifiez votre connexion.", 0);
+  }
+
+  if (!reponse.ok) {
+    let details: { error?: { message?: string; code?: string }; message?: string } = {};
+    try {
+      details = (await reponse.json()) as typeof details;
+    } catch {
+      /* réponse non JSON */
+    }
+    // Better Auth répond avec { message }, notre API avec { error: { message } } :
+    // le front ne doit pas avoir à connaître cette différence.
+    const message =
+      details.error?.message ??
+      details.message ??
+      (reponse.status === 429
+        ? "Trop de tentatives. Patientez un instant avant de réessayer."
+        : "Identifiants incorrects.");
+    throw new ErreurApi(message, reponse.status, details.error?.code);
+  }
+
+  return (await reponse.json()) as T;
+}
 
 async function appeler<T>(chemin: string, signal?: AbortSignal): Promise<T> {
   // `exactOptionalPropertyTypes` interdit de passer `signal: undefined` : on ne pose la
@@ -92,4 +127,16 @@ export const api = {
 
   livraison: (signal?: AbortSignal) =>
     appeler<{ items: DeliveryRegion[] }>("/api/livraison", signal).then((r) => r.items),
+
+  /** Session courante. Renvoie `null` si personne n'est connecté. */
+  moi: (signal?: AbortSignal) =>
+    appeler<{ utilisateur: SessionUser | null }>("/api/moi", signal).then((r) => r.utilisateur),
+
+  inscrire: (nom: string, email: string, motDePasse: string) =>
+    envoyer<unknown>("/api/auth/sign-up/email", { name: nom, email, password: motDePasse }),
+
+  connecter: (email: string, motDePasse: string) =>
+    envoyer<unknown>("/api/auth/sign-in/email", { email, password: motDePasse }),
+
+  deconnecter: () => envoyer<unknown>("/api/auth/sign-out", {}),
 };

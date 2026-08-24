@@ -46,12 +46,11 @@ const initialState: State = {
   user: null,
 };
 
-// Seuls le panier et la session sont persistés. Y garder le catalogue produirait
-// exactement le défaut rencontré avec les images : un navigateur servant indéfiniment
-// de vieilles données en ignorant la source.
-const STORAGE_KEY = "decorek-panier-v1";
+// Seul le panier est persisté. Le catalogue viendrait périmé, et la session vit
+// désormais dans un cookie httpOnly que le navigateur ne peut pas lire.
+const STORAGE_KEY = "decorek-panier-v2";
 
-type EtatPersiste = Pick<State, "cart" | "user">;
+type EtatPersiste = Pick<State, "cart">;
 
 type StoreValue = State & {
   ready: boolean;
@@ -64,8 +63,10 @@ type StoreValue = State & {
   clearCart: () => void;
   cartCount: number;
   cartSubtotal: number;
-  signIn: (user: SessionUser) => void;
-  signOut: () => void;
+  /** Connexion réelle : la session vit dans un cookie posé par le serveur. */
+  signIn: (email: string, motDePasse: string) => Promise<void>;
+  inscrire: (nom: string, email: string, motDePasse: string) => Promise<void>;
+  signOut: () => Promise<void>;
   validatePromo: (
     code: string,
     subtotal: number,
@@ -101,11 +102,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const brut = window.localStorage.getItem(STORAGE_KEY);
       if (brut) {
         const persiste = JSON.parse(brut) as Partial<EtatPersiste>;
-        setState((s) => ({
-          ...s,
-          cart: persiste.cart ?? s.cart,
-          user: persiste.user ?? s.user,
-        }));
+        setState((s) => ({ ...s, cart: persiste.cart ?? s.cart }));
       }
     } catch {
       /* panier illisible : on repart d'un panier vide plutôt que de bloquer le site */
@@ -113,13 +110,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const persiste: EtatPersiste = { cart: state.cart, user: state.user };
+    const persiste: EtatPersiste = { cart: state.cart };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persiste));
     } catch {
       /* quota indisponible */
     }
-  }, [state.cart, state.user]);
+  }, [state.cart]);
 
   // Chargement du catalogue depuis l'API. Volontairement côté client : le rendu serveur
   // n'a pas d'adresse d'API à interroger, et les données publiques n'ont pas besoin
@@ -129,7 +126,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     void (async () => {
       try {
-        const [catalogue, categories, content, regions] = await Promise.all([
+        const [catalogue, categories, content, regions, utilisateur] = await Promise.all([
           // Le catalogue entier est chargé pour les écrans qui filtrent encore côté
           // client (accueil, back-office). La boutique, elle, interroge l'API page par
           // page. Au-delà de quelques dizaines de produits, ces écrans devront suivre.
@@ -137,8 +134,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           api.categories(controleur.signal),
           api.contenu(controleur.signal),
           api.livraison(controleur.signal),
+          // La session est relue au serveur : le navigateur ne décide pas qui il est.
+          api.moi(controleur.signal).catch(() => null),
         ]);
-        setState((s) => ({ ...s, products: catalogue.items, categories, content, regions }));
+        setState((s) => ({
+          ...s,
+          products: catalogue.items,
+          categories,
+          content,
+          regions,
+          user: utilisateur,
+        }));
         setErreurChargement(null);
       } catch (erreur) {
         if (controleur.signal.aborted) return;
@@ -191,8 +197,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       removeFromCart: (productId) =>
         patch((s) => ({ ...s, cart: s.cart.filter((l) => l.productId !== productId) })),
       clearCart: () => patch((s) => ({ ...s, cart: [] })),
-      signIn: (user) => patch((s) => ({ ...s, user })),
-      signOut: () => patch((s) => ({ ...s, user: null })),
+      signIn: async (email, motDePasse) => {
+        await api.connecter(email, motDePasse);
+        // On relit la session plutôt que de croire le formulaire : le rôle admin
+        // vient du serveur, jamais de ce que le navigateur a saisi.
+        const utilisateur = await api.moi();
+        patch((s) => ({ ...s, user: utilisateur }));
+      },
+      inscrire: async (nom, email, motDePasse) => {
+        await api.inscrire(nom, email, motDePasse);
+        const utilisateur = await api.moi();
+        patch((s) => ({ ...s, user: utilisateur }));
+      },
+      signOut: async () => {
+        await api.deconnecter().catch(() => undefined);
+        patch((s) => ({ ...s, user: null }));
+      },
       validatePromo: (code, subtotal) => {
         const promo = state.promos.find((p) => p.code.toUpperCase() === code.trim().toUpperCase());
         if (!promo) return { error: "Ce code promo n'existe pas." };

@@ -53,9 +53,10 @@ function Admin() {
   const store = useStore();
   const [tab, setTab] = useState<TabId>("dashboard");
 
-  if (!store.user?.isAdmin) {
-    return <AdminLogin />;
-  }
+  if (!store.user) return <AdminLogin />;
+  // Connecté mais sans le rôle : le dire franchement plutôt que de redemander des
+  // identifiants, ce qui laisserait croire à une faute de frappe.
+  if (!store.user.isAdmin) return <AccesRefuse />;
 
   return (
     <div className="min-h-screen bg-sand">
@@ -1175,8 +1176,32 @@ function Delivery() {
   );
 }
 
-const ADMIN_EMAIL = "admin@decorek.sn";
-const ADMIN_PASSWORD = "password123";
+function AccesRefuse() {
+  const store = useStore();
+  return (
+    <div className="grid min-h-screen place-items-center bg-sand px-4">
+      <div className="w-full max-w-md border border-border bg-background p-8 text-center">
+        <p className="label-mono text-muted-foreground">Deco'Rek — Back-office</p>
+        <h1 className="title-lg mt-3">Accès refusé.</h1>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Le compte <span className="font-mono">{store.user?.email}</span> n'a pas les droits
+          d'administration. Contactez un responsable pour qu'il vous les accorde.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => void store.signOut()}
+            className="label-mono border border-border px-4 py-2 transition-colors hover:bg-muted"
+          >
+            Se déconnecter
+          </button>
+          <Link to="/" className="label-mono border border-border px-4 py-2 hover:bg-muted">
+            Retour au site
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AdminLogin() {
   const store = useStore();
@@ -1184,15 +1209,22 @@ function AdminLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const [enCours, setEnCours] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (email.trim().toLowerCase() !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-      setError("Identifiants invalides.");
-      return;
-    }
     setError("");
-    store.signIn({ name: "Administrateur", email: ADMIN_EMAIL, isAdmin: true });
-    toast.success("Bienvenue dans le back-office");
+    setEnCours(true);
+    try {
+      // Le serveur seul décide qui est administrateur : ce formulaire ne fait
+      // qu'ouvrir une session, le rôle est vérifié à chaque requête ensuite.
+      await store.signIn(email.trim().toLowerCase(), password);
+      toast.success("Connexion réussie");
+    } catch (erreur) {
+      setError(erreur instanceof Error ? erreur.message : "Identifiants invalides.");
+    } finally {
+      setEnCours(false);
+    }
   }
 
   return (
@@ -1204,7 +1236,7 @@ function AdminLogin() {
           Espace réservé à l'équipe. Accès par identifiants administrateur.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <form onSubmit={(e) => void onSubmit(e)} className="mt-8 space-y-4">
           <div className="space-y-2">
             <Label className="label-mono" htmlFor="admin-email">
               Email

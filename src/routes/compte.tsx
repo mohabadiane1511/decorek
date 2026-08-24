@@ -25,25 +25,39 @@ export const Route = createFileRoute("/compte")({
 });
 
 function Compte() {
-  const { user, signIn, signOut, orders } = useStore();
+  const { user, signIn, inscrire, signOut, orders } = useStore();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [enCours, setEnCours] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   if (!user) {
-    const submit = (e: React.FormEvent) => {
+    const submit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!email.trim() || password.length < 4) {
-        toast.error("Email et mot de passe (4 caractères minimum) requis.");
+      const adresse = email.trim().toLowerCase();
+      // Le serveur impose 8 caractères : autant le dire ici plutôt que de laisser
+      // partir une requête vouée à l'échec.
+      if (!adresse || password.length < 8) {
+        toast.error("Adresse e-mail et mot de passe d'au moins 8 caractères requis.");
         return;
       }
-      signIn({
-        name: name.trim() || email.split("@")[0]!,
-        email: email.trim().toLowerCase(),
-        isAdmin: email.trim().toLowerCase().startsWith("admin"),
-      });
-      toast.success(mode === "login" ? "Bienvenue !" : "Compte créé");
+
+      setEnCours(true);
+      try {
+        if (mode === "login") {
+          await signIn(adresse, password);
+          toast.success("Bienvenue !");
+        } else {
+          await inscrire(name.trim() || adresse.split("@")[0]!, adresse, password);
+          toast.success("Compte créé");
+        }
+        setPassword("");
+      } catch (erreur) {
+        toast.error(erreur instanceof Error ? erreur.message : "Connexion impossible.");
+      } finally {
+        setEnCours(false);
+      }
     };
 
     return (
@@ -53,7 +67,7 @@ function Compte() {
           intro="Un compte vous permet d'utiliser les codes promo et de retrouver l'historique de vos commandes."
         />
         <div className="mx-auto max-w-md px-4 pb-24">
-          <form onSubmit={submit} className="space-y-4 border border-border p-6">
+          <form onSubmit={(e) => void submit(e)} className="space-y-4 border border-border p-6">
             {mode === "signup" && (
               <div>
                 <Label htmlFor="n">Nom complet</Label>
@@ -85,18 +99,15 @@ function Compte() {
                 className="mt-1.5 rounded-none"
               />
             </div>
-            <button type="submit" className="btn-square btn-solid w-full">
-              {mode === "login" ? "Se connecter" : "Créer mon compte"}
-            </button>
             <button
-              type="button"
-              onClick={() =>
-                signIn({ name: "Client Google", email: "client.google@example.sn", isAdmin: false })
-              }
-              className="w-full border border-border px-6 py-3 text-sm transition-colors hover:bg-muted"
+              type="submit"
+              disabled={enCours}
+              className="btn-square btn-solid w-full disabled:opacity-50"
             >
-              Continuer avec Google
+              {enCours ? "Un instant…" : mode === "login" ? "Se connecter" : "Créer mon compte"}
             </button>
+            {/* La connexion Google reviendra une fois les identifiants OAuth fournis.
+                Un bouton qui échoue au clic vaut moins qu'un bouton absent. */}
             <p className="pt-2 text-center text-sm text-muted-foreground">
               {mode === "login" ? "Pas encore de compte ?" : "Déjà cliente ?"}{" "}
               <button
@@ -108,7 +119,7 @@ function Compte() {
               </button>
             </p>
             <p className="text-center text-xs text-muted-foreground">
-              Démo : utilisez un email commençant par « admin » pour accéder au back-office.
+              Le mot de passe doit comporter au moins 8 caractères.
             </p>
           </form>
         </div>
@@ -134,7 +145,12 @@ function Compte() {
             </Link>
           )}
           <button
-            onClick={() => signOut()}
+            onClick={() => {
+              // Revenir au formulaire de connexion : quelqu'un qui vient de se
+              // déconnecter veut se reconnecter, pas créer un second compte.
+              setMode("login");
+              void signOut();
+            }}
             className="border border-border px-5 py-2.5 text-sm transition-colors hover:bg-muted"
           >
             Se déconnecter

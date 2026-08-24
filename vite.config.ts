@@ -25,6 +25,10 @@ export default defineConfig({
         "/api": {
           target: `http://localhost:${PORT_API}`,
           changeOrigin: true,
+          // Transmet X-Forwarded-For. Sans cela l'API ne voit qu'une seule adresse —
+          // celle du proxy — et la limitation de débit compte tous les visiteurs
+          // ensemble : le premier à atteindre le seuil bloque tout le monde.
+          xfwd: true,
         },
         "/media": {
           target: `http://localhost:${PORT_MEDIA}`,
