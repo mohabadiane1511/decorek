@@ -122,11 +122,42 @@ test("le lien magique connecte sans mot de passe", async ({ page }) => {
   await creerCompte(page, { email: adresse, mdp: "motdepasse123", nom: "Awa Diop" });
   await page.getByRole("button", { name: "Se déconnecter" }).click();
 
+  await page.getByRole("tab", { name: "Lien par e-mail" }).click();
+  // Le champ mot de passe doit disparaître : on ne le demande pas à quelqu'un venu
+  // précisément pour s'en passer.
+  await expect(page.getByLabel("Mot de passe", { exact: true })).toHaveCount(0);
   await page.getByLabel("Email").fill(adresse);
-  await page.getByRole("button", { name: "Recevoir un lien de connexion" }).click();
+  await page.getByRole("button", { name: "Recevoir mon lien" }).click();
 
   const texte = await attendreMessage(adresse, "lien de connexion");
   await page.goto(extraireLien(texte));
 
   await expect(page.getByText("Bonjour, Awa Diop")).toBeVisible({ timeout: 15_000 });
+});
+
+test("la bascule masque le mot de passe et le rétablit", async ({ page }) => {
+  await page.goto("/compte");
+
+  // Par défaut : connexion classique.
+  await expect(page.getByLabel("Mot de passe", { exact: true })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Lien par e-mail" }).click();
+  await expect(page.getByLabel("Mot de passe", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Recevoir mon lien" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Mot de passe" }).click();
+  await expect(page.getByLabel("Mot de passe", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Se connecter" })).toBeVisible();
+});
+
+test("le mot de passe oublié annonce l'envoi sans révéler si le compte existe", async ({
+  page,
+}) => {
+  await page.goto("/compte");
+  await page.getByLabel("Email").fill(`inconnu-total-${marque}@test.sn`);
+  await page.getByRole("button", { name: "Mot de passe oublié ?" }).click();
+
+  // Formulation volontairement conditionnelle : confirmer l'existence d'un compte
+  // permettrait de découvrir qui est client de la boutique.
+  await expect(page.getByText(/Si un compte existe/i)).toBeVisible({ timeout: 15_000 });
 });

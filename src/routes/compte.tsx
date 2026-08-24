@@ -25,25 +25,132 @@ export const Route = createFileRoute("/compte")({
   component: Compte,
 });
 
+/** Méthode de connexion choisie. L'inscription passe toujours par un mot de passe. */
+type Methode = "motdepasse" | "lien";
+
+/** Écran intermédiaire affiché après un envoi d'e-mail. */
+type Attente = { titre: string; intro: string; adresse: string; relance?: () => void } | null;
+
+/**
+ * Bascule entre les méthodes de connexion.
+ *
+ * Reprend l'aspect des filtres de la boutique : un seul bloc bordé, l'option active en
+ * inversé. Sans elle, on demandait un mot de passe à quelqu'un venu justement pour
+ * s'en passer.
+ */
+function ChoixMethode({ valeur, onChange }: { valeur: Methode; onChange: (m: Methode) => void }) {
+  const options: { id: Methode; libelle: string }[] = [
+    { id: "motdepasse", libelle: "Mot de passe" },
+    { id: "lien", libelle: "Lien par e-mail" },
+  ];
+
+  return (
+    <div className="flex border border-border" role="tablist" aria-label="Méthode de connexion">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          role="tab"
+          aria-selected={valeur === o.id}
+          onClick={() => onChange(o.id)}
+          className={`label-mono flex-1 px-4 py-3 transition-colors ${
+            valeur === o.id ? "bg-foreground text-background" : "hover:bg-muted"
+          }`}
+        >
+          {o.libelle}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EcranAttente({ attente, retour }: { attente: NonNullable<Attente>; retour: () => void }) {
+  const [relance, setRelance] = useState(false);
+
+  return (
+    <ShopLayout>
+      <PageHeader title={attente.titre} intro={attente.intro} />
+      <div className="mx-auto max-w-md px-4 pb-24">
+        <div className="border border-border p-6">
+          <p className="text-sm leading-relaxed">
+            Message envoyé à <span className="font-mono">{attente.adresse}</span>.
+          </p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Pensez à regarder dans les indésirables si vous ne le voyez pas arriver.
+          </p>
+
+          {attente.relance && (
+            <button
+              type="button"
+              disabled={relance}
+              onClick={() => {
+                attente.relance?.();
+                setRelance(true);
+                toast.success("Message renvoyé");
+              }}
+              className="btn-square btn-outline mt-6 w-full disabled:opacity-50"
+            >
+              {relance ? "Message renvoyé" : "Renvoyer"}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={retour}
+            className="mt-3 w-full text-center text-sm underline"
+          >
+            Retour à la connexion
+          </button>
+        </div>
+      </div>
+    </ShopLayout>
+  );
+}
+
 function Compte() {
   const { user, signIn, inscrire, signOut, orders } = useStore();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [methode, setMethode] = useState<Methode>("motdepasse");
   const [enCours, setEnCours] = useState(false);
-  const [aConfirmer, setAConfirmer] = useState<string | null>(null);
-  const [lienEnvoye, setLienEnvoye] = useState(false);
+  const [attente, setAttente] = useState<Attente>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
 
   if (!user) {
+    if (attente) {
+      return <EcranAttente attente={attente} retour={() => setAttente(null)} />;
+    }
+
+    const parLien = mode === "login" && methode === "lien";
+
     const submit = async (e: React.FormEvent) => {
       e.preventDefault();
       const adresse = email.trim().toLowerCase();
-      // Le serveur impose 8 caractères : autant le dire ici plutôt que de laisser
-      // partir une requête vouée à l'échec.
-      if (!adresse || password.length < 8) {
-        toast.error("Adresse e-mail et mot de passe d'au moins 8 caractères requis.");
+      if (!adresse) {
+        toast.error("Indiquez votre adresse e-mail.");
+        return;
+      }
+
+      // Connexion par lien : rien d'autre à saisir. La réponse ne dit jamais si le
+      // compte existe — l'inverse permettrait de découvrir qui est client de la boutique.
+      if (parLien) {
+        setEnCours(true);
+        await api.demanderLienMagique(adresse).catch(() => undefined);
+        setEnCours(false);
+        setAttente({
+          titre: "Vérifiez votre boîte",
+          intro:
+            "Si un compte existe avec cette adresse, un lien de connexion vient d'être envoyé.",
+          adresse,
+          relance: () => void api.demanderLienMagique(adresse).catch(() => undefined),
+        });
+        return;
+      }
+
+      if (password.length < 8) {
+        toast.error("Le mot de passe doit comporter au moins 8 caractères.");
         return;
       }
       // Une faute de frappe à l'inscription enfermerait le client dehors : il ne
@@ -62,7 +169,12 @@ function Compte() {
           await inscrire(name.trim() || adresse.split("@")[0]!, adresse, password);
           // La session ne s'ouvre qu'une fois l'adresse confirmée : on l'annonce
           // clairement, sinon le client croirait son inscription en échec.
-          setAConfirmer(adresse);
+          setAttente({
+            titre: "Confirmez votre adresse",
+            intro: "Votre compte est créé. Il ne reste qu'à valider votre adresse e-mail.",
+            adresse,
+            relance: () => void api.renvoyerVerification(adresse).catch(() => undefined),
+          });
         }
         setPassword("");
         setConfirmation("");
@@ -73,49 +185,11 @@ function Compte() {
       }
     };
 
-    if (aConfirmer) {
-      return (
-        <ShopLayout>
-          <PageHeader
-            title="Confirmez votre adresse"
-            intro="Votre compte est créé. Il ne reste qu'à valider votre adresse e-mail."
-          />
-          <div className="mx-auto max-w-md px-4 pb-24">
-            <div className="border border-border p-6">
-              <p className="text-sm leading-relaxed">
-                Nous avons envoyé un lien à <span className="font-mono">{aConfirmer}</span>.
-                Ouvrez-le pour activer votre compte — il est valable 24 heures.
-              </p>
-              <p className="mt-4 text-sm text-muted-foreground">
-                Pensez à regarder dans les indésirables si vous ne le voyez pas.
-              </p>
-              <button
-                type="button"
-                disabled={lienEnvoye}
-                onClick={() => {
-                  void api.renvoyerVerification(aConfirmer).catch(() => undefined);
-                  setLienEnvoye(true);
-                  toast.success("Lien renvoyé");
-                }}
-                className="btn-square btn-outline mt-6 w-full disabled:opacity-50"
-              >
-                {lienEnvoye ? "Lien renvoyé" : "Renvoyer le lien"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAConfirmer(null);
-                  setMode("login");
-                }}
-                className="mt-3 w-full text-center text-sm underline"
-              >
-                Retour à la connexion
-              </button>
-            </div>
-          </div>
-        </ShopLayout>
-      );
-    }
+    const libelleAction = parLien
+      ? "Recevoir mon lien"
+      : mode === "login"
+        ? "Se connecter"
+        : "Créer mon compte";
 
     return (
       <ShopLayout>
@@ -125,6 +199,8 @@ function Compte() {
         />
         <div className="mx-auto max-w-md px-4 pb-24">
           <form onSubmit={(e) => void submit(e)} className="space-y-4 border border-border p-6">
+            {mode === "login" && <ChoixMethode valeur={methode} onChange={setMethode} />}
+
             {mode === "signup" && (
               <div>
                 <Label htmlFor="n">Nom complet</Label>
@@ -136,27 +212,35 @@ function Compte() {
                 />
               </div>
             )}
+
             <div>
               <Label htmlFor="e">Email</Label>
               <Input
                 id="e"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1.5 rounded-none"
               />
             </div>
-            <div>
-              <Label htmlFor="p">Mot de passe</Label>
-              <Input
-                id="p"
-                type="password"
-                autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 rounded-none"
-              />
-            </div>
+
+            {/* Le champ mot de passe disparaît en mode lien : le demander à quelqu'un
+                qui vient précisément pour s'en passer n'aurait aucun sens. */}
+            {!parLien && (
+              <div>
+                <Label htmlFor="p">Mot de passe</Label>
+                <Input
+                  id="p"
+                  type="password"
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1.5 rounded-none"
+                />
+              </div>
+            )}
+
             {mode === "signup" && (
               <div>
                 <Label htmlFor="p2">Confirmer le mot de passe</Label>
@@ -175,14 +259,22 @@ function Compte() {
                 )}
               </div>
             )}
+
             <button
               type="submit"
               disabled={enCours}
               className="btn-square btn-solid w-full disabled:opacity-50"
             >
-              {enCours ? "Un instant…" : mode === "login" ? "Se connecter" : "Créer mon compte"}
+              {enCours ? "Un instant…" : libelleAction}
             </button>
-            {mode === "login" && (
+
+            <p className="text-center text-xs text-muted-foreground">
+              {parLien
+                ? "Vous recevrez un lien valable quelques minutes, utilisable une seule fois."
+                : "Le mot de passe doit comporter au moins 8 caractères."}
+            </p>
+
+            {mode === "login" && methode === "motdepasse" && (
               <button
                 type="button"
                 onClick={() => {
@@ -191,30 +283,35 @@ function Compte() {
                     toast.error("Indiquez d'abord votre adresse e-mail.");
                     return;
                   }
-                  // Réponse volontairement identique que le compte existe ou non :
-                  // dire « adresse inconnue » révélerait qui est client de la boutique.
-                  void api.demanderLienMagique(adresse).catch(() => undefined);
-                  toast.success("Si un compte existe, un lien vient d'être envoyé.");
+                  void api.reinitialiserMotDePasse(adresse).catch(() => undefined);
+                  setAttente({
+                    titre: "Vérifiez votre boîte",
+                    intro:
+                      "Si un compte existe avec cette adresse, un lien de réinitialisation vient d'être envoyé.",
+                    adresse,
+                    relance: () => void api.reinitialiserMotDePasse(adresse).catch(() => undefined),
+                  });
                 }}
-                className="w-full border border-border px-6 py-3 text-sm transition-colors hover:bg-muted"
+                className="w-full text-center text-sm underline"
               >
-                Recevoir un lien de connexion
+                Mot de passe oublié ?
               </button>
             )}
+
             {/* La connexion Google reviendra une fois les identifiants OAuth fournis.
                 Un bouton qui échoue au clic vaut moins qu'un bouton absent. */}
-            <p className="pt-2 text-center text-sm text-muted-foreground">
+            <p className="border-t border-border pt-4 text-center text-sm text-muted-foreground">
               {mode === "login" ? "Pas encore de compte ?" : "Déjà cliente ?"}{" "}
               <button
                 type="button"
-                onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                onClick={() => {
+                  setMode(mode === "login" ? "signup" : "login");
+                  setMethode("motdepasse");
+                }}
                 className="underline"
               >
                 {mode === "login" ? "Créer un compte" : "Se connecter"}
               </button>
-            </p>
-            <p className="text-center text-xs text-muted-foreground">
-              Le mot de passe doit comporter au moins 8 caractères.
             </p>
           </form>
         </div>
@@ -244,6 +341,7 @@ function Compte() {
               // Revenir au formulaire de connexion : quelqu'un qui vient de se
               // déconnecter veut se reconnecter, pas créer un second compte.
               setMode("login");
+              setMethode("motdepasse");
               void signOut();
             }}
             className="border border-border px-5 py-2.5 text-sm transition-colors hover:bg-muted"

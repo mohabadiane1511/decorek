@@ -174,6 +174,13 @@ export const api = {
       callbackURL: "/compte",
     }),
 
+  /** Demande un lien de réinitialisation du mot de passe. */
+  reinitialiserMotDePasse: (email: string) =>
+    envoyer<unknown>("/api/auth/request-password-reset", {
+      email,
+      redirectTo: "/compte",
+    }),
+
   /** Demande un lien de connexion à usage unique. */
   demanderLienMagique: (email: string) =>
     envoyer<unknown>("/api/auth/sign-in/magic-link", { email, callbackURL: "/compte" }),
