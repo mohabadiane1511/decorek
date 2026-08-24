@@ -46,6 +46,54 @@ export function periodeCourante(date = new Date()): string {
   return `${String(date.getFullYear()).slice(2)}${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+type ClientPrisma = PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+
+/**
+ * Vérifie un code promotionnel et calcule sa remise, sans le consommer.
+ *
+ * Partagé entre la prévisualisation (le client saisit son code et voit le montant) et
+ * la création de commande. Une seule implémentation : deux copies finiraient par
+ * diverger, et l'écart se verrait sur un total affiché différent du total facturé.
+ */
+export async function validerPromo(
+  tx: ClientPrisma,
+  code: string,
+  sousTotal: number,
+  userId: string | null,
+): Promise<{ code: string; promoId: string; discount: number }> {
+  if (!userId) {
+    throw new ErreurApi("INTERDIT", "Les codes promo sont réservés aux clients connectés.");
+  }
+
+  const promo = await tx.promoCode.findUnique({
+    where: { code: code.trim().toUpperCase() },
+    include: { _count: { select: { redemptions: true } } },
+  });
+  const maintenant = new Date();
+
+  if (!promo) throw new ErreurApi("VALIDATION", "Ce code promo n'existe pas.");
+  if (!promo.active) throw new ErreurApi("VALIDATION", "Ce code promo n'est plus actif.");
+  if (maintenant < promo.startsAt) {
+    throw new ErreurApi("VALIDATION", "Ce code n'est pas encore valable.");
+  }
+  if (maintenant > promo.endsAt) throw new ErreurApi("VALIDATION", "Ce code a expiré.");
+  if (promo._count.redemptions >= promo.maxUses) {
+    throw new ErreurApi("VALIDATION", "Ce code a atteint sa limite d'utilisation.");
+  }
+  if (sousTotal < promo.minAmount) {
+    throw new ErreurApi(
+      "VALIDATION",
+      `Ce code s'applique à partir de ${promo.minAmount.toLocaleString("fr-FR")} FCFA d'achat.`,
+    );
+  }
+
+  return {
+    code: promo.code,
+    promoId: promo.id,
+    discount: calculerRemise(promo.type, promo.value, sousTotal),
+  };
+}
+
 /**
  * Crée une commande.
  *
@@ -119,34 +167,10 @@ export async function creerCommande(
     let codePromo: string | undefined;
     let promoId: string | undefined;
     if (demande.promoCode) {
-      // Réservé aux comptes : c'est la règle de la maquette, et elle permet de
-      // plafonner les usages par client.
-      if (!demande.userId) {
-        throw new ErreurApi("INTERDIT", "Les codes promo sont réservés aux clients connectés.");
-      }
-      const promo = await tx.promoCode.findUnique({
-        where: { code: demande.promoCode.trim().toUpperCase() },
-        include: { _count: { select: { redemptions: true } } },
-      });
-      const maintenant = new Date();
-      if (!promo) throw new ErreurApi("VALIDATION", "Ce code promo n'existe pas.");
-      if (!promo.active) throw new ErreurApi("VALIDATION", "Ce code promo n'est plus actif.");
-      if (maintenant < promo.startsAt) {
-        throw new ErreurApi("VALIDATION", "Ce code n'est pas encore valable.");
-      }
-      if (maintenant > promo.endsAt) throw new ErreurApi("VALIDATION", "Ce code a expiré.");
-      if (promo._count.redemptions >= promo.maxUses) {
-        throw new ErreurApi("VALIDATION", "Ce code a atteint sa limite d'utilisation.");
-      }
-      if (subtotal < promo.minAmount) {
-        throw new ErreurApi(
-          "VALIDATION",
-          `Ce code s'applique à partir de ${promo.minAmount.toLocaleString("fr-FR")} FCFA d'achat.`,
-        );
-      }
-      discount = calculerRemise(promo.type, promo.value, subtotal);
-      codePromo = promo.code;
-      promoId = promo.id;
+      const valide = await validerPromo(tx, demande.promoCode, subtotal, demande.userId);
+      discount = valide.discount;
+      codePromo = valide.code;
+      promoId = valide.promoId;
     }
 
     const deliveryFee = calculerLivraison(zone.fee, subtotal, contenu.freeShippingFrom);

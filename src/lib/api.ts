@@ -1,4 +1,11 @@
-import type { Category, DeliveryRegion, Product, SessionUser, SiteContent } from "@/data/types";
+import type {
+  Category,
+  DeliveryRegion,
+  Order,
+  Product,
+  SessionUser,
+  SiteContent,
+} from "@/data/types";
 
 /**
  * Client de l'API.
@@ -97,6 +104,15 @@ export type FiltresProduits = {
   parPage?: number | undefined;
 };
 
+export type LigneDemandee = { productId: string; quantity: number };
+
+export type DemandeCommande = {
+  customer: { name: string; phone: string; email?: string | undefined };
+  delivery: { areaId: string; address: string; note?: string | undefined };
+  items: LigneDemandee[];
+  promoCode?: string | undefined;
+};
+
 export type PageProduits = {
   items: Product[];
   total: number;
@@ -139,4 +155,16 @@ export const api = {
     envoyer<unknown>("/api/auth/sign-in/email", { email, password: motDePasse }),
 
   deconnecter: () => envoyer<unknown>("/api/auth/sign-out", {}),
+
+  /**
+   * Envoie la commande. Le corps ne contient aucun montant : les prix, les frais et le
+   * total sont calculés par le serveur à partir de la base.
+   */
+  creerCommande: (demande: DemandeCommande) => envoyer<Order>("/api/commandes", demande),
+
+  verifierPromo: (code: string, items: LigneDemandee[]) =>
+    envoyer<{ code: string; discount: number; subtotal: number }>("/api/promos/verifier", {
+      code,
+      items,
+    }),
 };

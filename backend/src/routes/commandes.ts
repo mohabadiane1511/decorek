@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Auth } from "../auth.js";
 import { lireSession } from "../auth-middleware.js";
 import type { Cache } from "../cache.js";
-import { creerCommande } from "../commandes.js";
+import { creerCommande, validerPromo } from "../commandes.js";
 import { corpsErreur } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 
@@ -39,8 +39,47 @@ const schemaCommande = z.object({
   promoCode: z.string().trim().max(40).optional(),
 });
 
+const schemaVerificationPromo = z.object({
+  code: z.string().trim().min(1).max(40),
+  items: z
+    .array(
+      z.object({ productId: z.string().min(1), quantity: z.coerce.number().int().min(1).max(99) }),
+    )
+    .min(1)
+    .max(50),
+});
+
 export function routesCommandes(prisma: PrismaClient, cache: Cache, auth: Auth): Hono {
   const routes = new Hono();
+
+  // Prévisualise la remise pour l'afficher avant validation, sans consommer le code.
+  // Le sous-total est recalculé ici aussi : afficher une remise assise sur un montant
+  // fourni par le client donnerait un aperçu différent du prix réellement facturé.
+  routes.post(
+    "/promos/verifier",
+    zValidator("json", schemaVerificationPromo, (resultat, c) => {
+      if (!resultat.success) {
+        return c.json(corpsErreur("VALIDATION", "Requête invalide.", resultat.error.issues), 400);
+      }
+      return undefined;
+    }),
+    async (c) => {
+      const { code, items } = c.req.valid("json");
+      const session = await lireSession(auth, prisma, c);
+
+      const produits = await prisma.product.findMany({
+        where: { id: { in: items.map((l) => l.productId) } },
+        select: { id: true, price: true },
+      });
+      const sousTotal = items.reduce((somme, ligne) => {
+        const produit = produits.find((p) => p.id === ligne.productId);
+        return somme + (produit ? produit.price * ligne.quantity : 0);
+      }, 0);
+
+      const valide = await validerPromo(prisma, code, sousTotal, session?.userId ?? null);
+      return c.json({ code: valide.code, discount: valide.discount, subtotal: sousTotal });
+    },
+  );
 
   routes.post(
     "/commandes",

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { seedContent, seedOrders, seedPromos } from "@/data/seed";
-import { api } from "@/lib/api";
+import { api, type DemandeCommande } from "@/lib/api";
 import type {
   Category,
   DeliveryRegion,
@@ -71,7 +71,8 @@ type StoreValue = State & {
     code: string,
     subtotal: number,
   ) => { promo: PromoCode; discount: number } | { error: string };
-  placeOrder: (order: Order) => void;
+  /** Envoie la commande au serveur, qui calcule les montants et renvoie la commande créée. */
+  placeOrder: (demande: DemandeCommande) => Promise<Order>;
   updateOrder: (id: string, patch: Partial<Order>) => void;
   setOrderStatus: (id: string, status: OrderStatus) => void;
   saveProduct: (product: Product) => void;
@@ -233,19 +234,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             : Math.min(promo.value, subtotal);
         return { promo, discount };
       },
-      placeOrder: (order) =>
+      placeOrder: async (demande) => {
+        const commande = await api.creerCommande(demande);
+        // Le panier n'est vidé qu'après confirmation du serveur : en cas de stock
+        // insuffisant ou de coupure réseau, le client retrouve ses articles.
         patch((s) => ({
           ...s,
-          orders: [order, ...s.orders],
+          orders: [commande, ...s.orders],
           cart: [],
+          // Les stocks ont changé : on les reflète sans attendre un rechargement.
           products: s.products.map((p) => {
-            const line = order.items.find((i) => i.productId === p.id);
-            return line ? { ...p, stock: Math.max(0, p.stock - line.quantity) } : p;
+            const ligne = commande.items.find((i) => i.productId === p.id);
+            return ligne ? { ...p, stock: Math.max(0, p.stock - ligne.quantity) } : p;
           }),
-          promos: s.promos.map((p) =>
-            order.promoCode && p.code === order.promoCode ? { ...p, uses: p.uses + 1 } : p,
-          ),
-        })),
+        }));
+        return commande;
+      },
       updateOrder: (id, orderPatch) =>
         patch((s) => ({
           ...s,

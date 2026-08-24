@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { formatFcfa } from "@/lib/format";
-import { newId, orderNumber, useStore } from "@/lib/store";
+import { api } from "@/lib/api";
+import { useStore } from "@/lib/store";
 import type { Order } from "@/data/types";
 
 export const Route = createFileRoute("/commande")({
@@ -29,21 +30,30 @@ export const Route = createFileRoute("/commande")({
 });
 
 function Commande() {
-  const { cart, products, cartSubtotal, regions, content, user, validatePromo, placeOrder } =
-    useStore();
+  const { cart, products, cartSubtotal, regions, content, user, placeOrder } = useStore();
   const navigate = useNavigate();
 
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [regionId, setRegionId] = useState(regions[0]?.id ?? "");
-  const [areaId, setAreaId] = useState(regions[0]?.areas[0]?.id ?? "");
+  const [regionId, setRegionId] = useState("");
+  const [areaId, setAreaId] = useState("");
+
+  // Les zones arrivent de l'API après le premier rendu : sans cette synchronisation,
+  // la sélection resterait vide et la commande impossible à valider.
+  useEffect(() => {
+    if (regionId || regions.length === 0) return;
+    const premiere = regions[0]!;
+    setRegionId(premiere.id);
+    setAreaId(premiere.areas[0]?.id ?? "");
+  }, [regions, regionId]);
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [appliedCode, setAppliedCode] = useState<string | undefined>();
   const [promoError, setPromoError] = useState("");
+  const [envoi, setEnvoi] = useState(false);
 
   const region = regions.find((r) => r.id === regionId);
   const area = region?.areas.find((a) => a.id === areaId) ?? region?.areas[0];
@@ -68,60 +78,67 @@ function Commande() {
     );
   }
 
-  const applyPromo = () => {
+  const applyPromo = async () => {
     setPromoError("");
     if (!user) {
       setPromoError("Les codes promo sont réservés aux clients connectés.");
       return;
     }
-    const result = validatePromo(code, cartSubtotal);
-    if ("error" in result) {
+    try {
+      // Le serveur recalcule le sous-total et la remise : l'aperçu affiché correspond
+      // ainsi exactement à ce qui sera facturé.
+      const verifie = await api.verifierPromo(
+        code,
+        lines.map(({ line }) => ({ productId: line.productId, quantity: line.quantity })),
+      );
+      setDiscount(verifie.discount);
+      setAppliedCode(verifie.code);
+      toast.success(`Code ${verifie.code} appliqué`);
+    } catch (erreur) {
       setDiscount(0);
       setAppliedCode(undefined);
-      setPromoError(result.error);
-      return;
+      setPromoError(erreur instanceof Error ? erreur.message : "Code promo invalide.");
     }
-    setDiscount(result.discount);
-    setAppliedCode(result.promo.code);
-    toast.success(`Code ${result.promo.code} appliqué`);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim() || !address.trim() || !region || !area) {
       toast.error("Merci de compléter vos coordonnées de livraison.");
       return;
     }
-    const order: Order = {
-      id: newId("o"),
-      number: orderNumber(),
-      createdAt: new Date().toISOString(),
-      customer: { name: name.trim(), phone: phone.trim(), email: email.trim() || undefined },
-      delivery: {
-        regionId: region.id,
-        regionName: region.name,
-        areaName: area.name,
-        address: address.trim(),
-        fee,
-        note: note.trim() || undefined,
-      },
-      items: lines.map(({ line, product }) => ({
-        productId: product!.id,
-        name: product!.name,
-        price: product!.price,
-        quantity: line.quantity,
-        image: product!.images[0] ?? "",
-      })),
-      subtotal: cartSubtotal,
-      discount,
-      promoCode: appliedCode,
-      total,
-      status: "en_attente",
-      paid: false,
-      userEmail: user?.email,
-    };
-    placeOrder(order);
-    void navigate({ to: "/confirmation/$number", params: { number: order.number } });
+
+    setEnvoi(true);
+    try {
+      // Aucun montant n'est transmis : le serveur relit les prix en base et calcule
+      // lui-même le total. Ce que l'écran affiche n'est qu'un aperçu.
+      const commande = await placeOrder({
+        customer: {
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim() || undefined,
+        },
+        delivery: {
+          areaId: area.id,
+          address: address.trim(),
+          note: note.trim() || undefined,
+        },
+        items: lines.map(({ line }) => ({
+          productId: line.productId,
+          quantity: line.quantity,
+        })),
+        promoCode: appliedCode,
+      });
+      void navigate({ to: "/confirmation/$number", params: { number: commande.number } });
+    } catch (erreur) {
+      // Stock épuisé entre-temps, code promo devenu invalide, réseau coupé : le panier
+      // est intact et le client peut corriger.
+      toast.error(
+        erreur instanceof Error ? erreur.message : "La commande n'a pas pu être envoyée.",
+      );
+    } finally {
+      setEnvoi(false);
+    }
   };
 
   return (
@@ -131,7 +148,7 @@ function Commande() {
         intro="Commande validée dès la soumission. Vous payez à la réception, après vérification du colis."
       />
       <form
-        onSubmit={submit}
+        onSubmit={(e) => void submit(e)}
         className="mx-auto grid max-w-6xl gap-10 px-4 pb-20 lg:grid-cols-[1fr_360px]"
       >
         <div className="space-y-10">
@@ -290,7 +307,7 @@ function Commande() {
               />
               <button
                 type="button"
-                onClick={applyPromo}
+                onClick={() => void applyPromo()}
                 className="border border-foreground px-4 text-sm transition-colors hover:bg-muted"
               >
                 OK
@@ -328,8 +345,12 @@ function Commande() {
             </div>
           </dl>
 
-          <button type="submit" className="btn-square btn-solid mt-6 w-full">
-            Valider ma commande
+          <button
+            type="submit"
+            disabled={envoi}
+            className="btn-square btn-solid mt-6 w-full disabled:opacity-50"
+          >
+            {envoi ? "Envoi en cours…" : "Valider ma commande"}
           </button>
         </aside>
       </form>
