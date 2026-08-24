@@ -40,6 +40,15 @@ try {
     update: {},
   });
 
+  // L'adresse est confirmée par la même occasion. Cette commande s'exécute déjà sur le
+  // serveur, par quelqu'un qui y a accès : lui demander en plus d'aller cliquer sur un
+  // lien reçu par e-mail n'ajouterait aucune garantie, et bloquerait la mise en route
+  // si la messagerie n'est pas encore configurée.
+  if (!utilisateur.emailVerified) {
+    await prisma.user.update({ where: { id: utilisateur.id }, data: { emailVerified: true } });
+    console.log("Adresse confirmée.");
+  }
+
   console.log(`${email} est désormais administrateur.`);
 } finally {
   await prisma.$disconnect();
