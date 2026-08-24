@@ -1,18 +1,23 @@
 import { Link } from "@tanstack/react-router";
-import { Facebook, Instagram, Music2, Ghost } from "lucide-react";
+import { SiFacebook, SiInstagram, SiSnapchat, SiTiktok } from "react-icons/si";
 const logo = "/images/logo-decorek.png";
 import { useStore } from "@/lib/store";
 
 export function Footer() {
   const { content, categories } = useStore();
 
-  // Lucide n'a pas d'icône Snapchat ni TikTok : on emprunte les plus proches
-  // visuellement, le libellé accessible portant le nom réel du réseau.
+  // Logos officiels et couleurs de marque : c'est ce qu'on reconnaît d'un coup d'œil,
+  // là où une icône générique demande un temps de lecture.
+  //
+  // Les pastilles passent sur fond clair, condition pour que ces couleurs restent
+  // lisibles : le noir de TikTok disparaîtrait sur l'anthracite du pied de page.
   const reseaux = [
-    { nom: "Facebook", url: content.facebook, Icone: Facebook },
-    { nom: "Instagram", url: content.instagram, Icone: Instagram },
-    { nom: "TikTok", url: content.tiktok, Icone: Music2 },
-    { nom: "Snapchat", url: content.snapchat, Icone: Ghost },
+    { nom: "Facebook", url: content.facebook, Icone: SiFacebook, couleur: "#1877F2" },
+    { nom: "Instagram", url: content.instagram, Icone: SiInstagram, couleur: "#E4405F" },
+    { nom: "TikTok", url: content.tiktok, Icone: SiTiktok, couleur: "#010101" },
+    // Le jaune de Snapchat est illisible sur blanc : la marque prévoit son logo en
+    // noir sur fond clair.
+    { nom: "Snapchat", url: content.snapchat, Icone: SiSnapchat, couleur: "#010101" },
     // Le champ peut manquer si l'API répond avec une version antérieure — un cache
     // pas encore périmé, un déploiement en cours. Sans cette prudence, le pied de
     // page échoue et emporte toute la page avec lui.
@@ -118,7 +123,7 @@ export function Footer() {
               vers un compte inexistant vaut moins que ne rien afficher. */}
           {reseaux.length > 0 && (
             <div className="mt-6 flex gap-3">
-              {reseaux.map(({ nom, url, Icone }) => (
+              {reseaux.map(({ nom, url, Icone, couleur }) => (
                 <a
                   key={nom}
                   href={url}
@@ -126,9 +131,9 @@ export function Footer() {
                   rel="noreferrer noopener"
                   aria-label={nom}
                   title={nom}
-                  className="grid h-10 w-10 place-items-center border border-background/25 transition-colors hover:bg-background hover:text-foreground"
+                  className="grid h-10 w-10 place-items-center bg-background transition-opacity hover:opacity-75"
                 >
-                  <Icone className="h-4 w-4" strokeWidth={1.5} />
+                  <Icone className="h-[18px] w-[18px]" style={{ color: couleur }} />
                 </a>
               ))}
             </div>
