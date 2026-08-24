@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { seedContent, seedOrders, seedPromos } from "@/data/seed";
+import { seedContent } from "@/data/seed";
 import { api, type DemandeCommande } from "@/lib/api";
 import type {
   Category,
@@ -33,13 +33,13 @@ type State = {
   user: SessionUser | null;
 };
 
-// Catalogue, catégories, zones et contenu viennent désormais de l'API. Commandes et
-// promotions restent sur les données de démonstration jusqu'aux lots 12 et 15.
+// Tout vient de l'API. Seul `content` garde une valeur de départ, le temps du premier
+// chargement : l'interface le lit sans attendre et afficherait sinon des champs vides.
 const initialState: State = {
   products: [],
   categories: [],
-  orders: seedOrders,
-  promos: seedPromos,
+  orders: [],
+  promos: [],
   regions: [],
   content: seedContent,
   cart: [],
@@ -73,16 +73,19 @@ type StoreValue = State & {
   ) => { promo: PromoCode; discount: number } | { error: string };
   /** Envoie la commande au serveur, qui calcule les montants et renvoie la commande créée. */
   placeOrder: (demande: DemandeCommande) => Promise<Order>;
-  updateOrder: (id: string, patch: Partial<Order>) => void;
-  setOrderStatus: (id: string, status: OrderStatus) => void;
-  saveProduct: (product: Product) => void;
-  deleteProduct: (id: string) => void;
-  saveCategory: (category: Category) => void;
-  deleteCategory: (id: string) => void;
-  savePromo: (promo: PromoCode) => void;
-  deletePromo: (id: string) => void;
-  setRegions: (regions: DeliveryRegion[]) => void;
-  setContent: (content: SiteContent) => void;
+  // Écritures du back-office : toutes passent par l'API et sont donc asynchrones.
+  // C'est le second changement de signature annoncé au plan, après signIn.
+  updateOrder: (id: string, patch: Partial<Order>) => Promise<void>;
+  setOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  saveProduct: (product: Product) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  saveCategory: (category: Category) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  savePromo: (promo: PromoCode) => Promise<void>;
+  deletePromo: (id: string) => Promise<void>;
+  setRegions: (regions: DeliveryRegion[]) => Promise<void>;
+  setContent: (content: SiteContent) => Promise<void>;
+  /** Recharge tout depuis le serveur. */
   resetDemo: () => void;
 };
 
@@ -146,6 +149,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           regions,
           user: utilisateur,
         }));
+
+        // Commandes et promotions ne concernent que le back-office : les charger pour
+        // tout le monde exposerait des données de gestion à chaque visiteur.
+        if (utilisateur?.isAdmin) {
+          const [commandes, promos] = await Promise.all([
+            api.commandesAdmin(undefined, controleur.signal),
+            api.promosAdmin(controleur.signal),
+          ]);
+          setState((s) => ({ ...s, orders: commandes, promos }));
+        }
         setErreurChargement(null);
       } catch (erreur) {
         if (controleur.signal.aborted) return;
@@ -250,54 +263,120 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }));
         return commande;
       },
-      updateOrder: (id, orderPatch) =>
+      updateOrder: async (id, orderPatch) => {
+        const commande = await api.majCommande(id, {
+          ...(orderPatch.paid !== undefined ? { paid: orderPatch.paid } : {}),
+          ...(orderPatch.internalNote !== undefined
+            ? { internalNote: orderPatch.internalNote ?? null }
+            : {}),
+          ...(orderPatch.status ? { status: orderPatch.status } : {}),
+        });
         patch((s) => ({
           ...s,
-          orders: s.orders.map((o) => (o.id === id ? { ...o, ...orderPatch } : o)),
-        })),
-      setOrderStatus: (id, status) =>
+          orders: s.orders.map((o) => (o.id === id ? { ...o, ...commande } : o)),
+        }));
+      },
+
+      setOrderStatus: async (id, status) => {
+        await api.majCommande(id, { status });
+        // Le stock a pu bouger dans les deux sens : on relit plutôt que de deviner.
+        const [commandes, catalogue] = await Promise.all([
+          api.commandesAdmin(),
+          api.produits({ parPage: 48 }),
+        ]);
+        patch((s) => ({ ...s, orders: commandes, products: catalogue.items }));
+      },
+
+      saveProduct: async (product) => {
+        const entree = {
+          name: product.name,
+          categoryId: product.categoryId,
+          price: product.price,
+          oldPrice: product.oldPrice ?? null,
+          stock: product.stock,
+          lowStockThreshold: product.lowStockThreshold,
+          description: product.description,
+          featured: product.featured,
+          images: product.images,
+        };
+        // Un identifiant absent des produits chargés signale une création.
+        const existe = state.products.some((p) => p.id === product.id);
+        const enregistre = existe
+          ? await api.majProduit(product.id, entree)
+          : await api.creerProduit(entree);
+
         patch((s) => ({
           ...s,
-          orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)),
-          products:
-            status === "annulee" || status === "non_honoree"
-              ? s.products.map((p) => {
-                  const order = s.orders.find((o) => o.id === id);
-                  if (!order || order.status === "annulee" || order.status === "non_honoree")
-                    return p;
-                  const line = order.items.find((i) => i.productId === p.id);
-                  return line ? { ...p, stock: p.stock + line.quantity } : p;
-                })
-              : s.products,
-        })),
-      saveProduct: (product) =>
+          products: existe
+            ? s.products.map((p) => (p.id === product.id ? enregistre : p))
+            : [enregistre, ...s.products],
+        }));
+      },
+
+      deleteProduct: async (id) => {
+        await api.supprimerProduit(id);
+        patch((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) }));
+      },
+
+      saveCategory: async (category) => {
+        const entree = { name: category.name, description: category.description };
+        const existe = state.categories.some((c) => c.id === category.id);
+        const enregistree = existe
+          ? await api.majCategorie(category.id, entree)
+          : await api.creerCategorie(entree);
+
         patch((s) => ({
           ...s,
-          products: s.products.some((p) => p.id === product.id)
-            ? s.products.map((p) => (p.id === product.id ? product : p))
-            : [product, ...s.products],
-        })),
-      deleteProduct: (id) =>
-        patch((s) => ({ ...s, products: s.products.filter((p) => p.id !== id) })),
-      saveCategory: (category) =>
+          categories: existe
+            ? s.categories.map((c) => (c.id === category.id ? enregistree : c))
+            : [...s.categories, enregistree],
+        }));
+      },
+
+      deleteCategory: async (id) => {
+        await api.supprimerCategorie(id);
+        patch((s) => ({ ...s, categories: s.categories.filter((c) => c.id !== id) }));
+      },
+
+      savePromo: async (promo) => {
+        const entree = {
+          code: promo.code,
+          type: promo.type,
+          value: promo.value,
+          minAmount: promo.minAmount,
+          startsAt: promo.startsAt,
+          endsAt: promo.endsAt,
+          maxUses: promo.maxUses,
+          active: promo.active,
+        };
+        const existe = state.promos.some((p) => p.id === promo.id);
+        const enregistre = existe
+          ? await api.majPromo(promo.id, entree)
+          : await api.creerPromo(entree);
+
         patch((s) => ({
           ...s,
-          categories: s.categories.some((c) => c.id === category.id)
-            ? s.categories.map((c) => (c.id === category.id ? category : c))
-            : [...s.categories, category],
-        })),
-      deleteCategory: (id) =>
-        patch((s) => ({ ...s, categories: s.categories.filter((c) => c.id !== id) })),
-      savePromo: (promo) =>
-        patch((s) => ({
-          ...s,
-          promos: s.promos.some((p) => p.id === promo.id)
-            ? s.promos.map((p) => (p.id === promo.id ? promo : p))
-            : [...s.promos, promo],
-        })),
-      deletePromo: (id) => patch((s) => ({ ...s, promos: s.promos.filter((p) => p.id !== id) })),
-      setRegions: (regions) => patch((s) => ({ ...s, regions })),
-      setContent: (content) => patch((s) => ({ ...s, content })),
+          promos: existe
+            ? s.promos.map((p) => (p.id === promo.id ? enregistre : p))
+            : [...s.promos, enregistre],
+        }));
+      },
+
+      deletePromo: async (id) => {
+        await api.supprimerPromo(id);
+        patch((s) => ({ ...s, promos: s.promos.filter((p) => p.id !== id) }));
+      },
+
+      setRegions: async (regions) => {
+        const enregistrees = await api.majLivraison(regions);
+        patch((s) => ({ ...s, regions: enregistrees }));
+      },
+
+      setContent: async (content) => {
+        const enregistre = await api.majContenu(content);
+        patch((s) => ({ ...s, content: enregistre }));
+      },
+
       resetDemo: () => {
         setState((s) => ({ ...initialState, cart: s.cart, user: s.user }));
         rafraichir();

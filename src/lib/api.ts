@@ -3,6 +3,7 @@ import type {
   DeliveryRegion,
   Order,
   Product,
+  PromoCode,
   SessionUser,
   SiteContent,
 } from "@/data/types";
@@ -74,6 +75,37 @@ async function envoyer<T>(chemin: string, corps: unknown): Promise<T> {
   return (await reponse.json()) as T;
 }
 
+/** Comme `envoyer`, pour les méthodes autres que POST. */
+async function envoyerMethode<T>(methode: string, chemin: string, corps?: unknown): Promise<T> {
+  const options: RequestInit = {
+    method: methode,
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    credentials: "same-origin",
+  };
+  if (corps !== undefined) options.body = JSON.stringify(corps);
+
+  let reponse: Response;
+  try {
+    reponse = await fetch(chemin, options);
+  } catch {
+    throw new ErreurApi("Impossible de joindre la boutique. Vérifiez votre connexion.", 0);
+  }
+  if (!reponse.ok) {
+    let details: CorpsErreur = {};
+    try {
+      details = (await reponse.json()) as CorpsErreur;
+    } catch {
+      /* réponse non JSON */
+    }
+    throw new ErreurApi(
+      details.error?.message ?? "L'enregistrement a échoué.",
+      reponse.status,
+      details.error?.code,
+    );
+  }
+  return (await reponse.json()) as T;
+}
+
 async function appeler<T>(chemin: string, signal?: AbortSignal): Promise<T> {
   // `exactOptionalPropertyTypes` interdit de passer `signal: undefined` : on ne pose la
   // propriété que si un signal est réellement fourni.
@@ -116,6 +148,30 @@ export type FiltresProduits = {
 };
 
 export type LigneDemandee = { productId: string; quantity: number };
+
+/** Ce que le back-office envoie pour créer ou modifier un produit. */
+export type EntreeProduit = {
+  name: string;
+  categoryId: string;
+  price: number;
+  oldPrice?: number | null;
+  stock: number;
+  lowStockThreshold: number;
+  description: string;
+  featured: boolean;
+  images: string[];
+};
+
+export type EntreePromo = {
+  code: string;
+  type: "percent" | "amount";
+  value: number;
+  minAmount: number;
+  startsAt: string;
+  endsAt: string;
+  maxUses: number;
+  active: boolean;
+};
 
 export type DemandeCommande = {
   customer: { name: string; phone: string; email?: string | undefined };
@@ -173,6 +229,68 @@ export const api = {
       email,
       callbackURL: "/compte",
     }),
+
+  // ---------------------------------------------------------- Administration
+
+  /** Commandes du back-office, filtrables par statut. */
+  commandesAdmin: (statut?: string, signal?: AbortSignal) =>
+    appeler<{ items: Order[] }>(
+      `/api/admin/commandes${statut ? `?statut=${encodeURIComponent(statut)}` : ""}`,
+      signal,
+    ).then((r) => r.items),
+
+  majCommande: (
+    id: string,
+    patch: { status?: string; paid?: boolean; internalNote?: string | null },
+  ) => envoyerMethode<Order>("PATCH", `/api/admin/commandes/${id}`, patch),
+
+  creerProduit: (produit: EntreeProduit) => envoyer<Product>("/api/admin/produits", produit),
+  majProduit: (id: string, produit: EntreeProduit) =>
+    envoyerMethode<Product>("PUT", `/api/admin/produits/${id}`, produit),
+  supprimerProduit: (id: string) => envoyerMethode<unknown>("DELETE", `/api/admin/produits/${id}`),
+
+  creerCategorie: (c: { name: string; description: string }) =>
+    envoyer<Category>("/api/admin/categories", c),
+  majCategorie: (id: string, c: { name: string; description: string }) =>
+    envoyerMethode<Category>("PUT", `/api/admin/categories/${id}`, c),
+  supprimerCategorie: (id: string) =>
+    envoyerMethode<unknown>("DELETE", `/api/admin/categories/${id}`),
+
+  promosAdmin: (signal?: AbortSignal) =>
+    appeler<{ items: PromoCode[] }>("/api/admin/promos", signal).then((r) => r.items),
+  creerPromo: (p: EntreePromo) => envoyer<PromoCode>("/api/admin/promos", p),
+  majPromo: (id: string, p: EntreePromo) =>
+    envoyerMethode<PromoCode>("PUT", `/api/admin/promos/${id}`, p),
+  supprimerPromo: (id: string) => envoyerMethode<unknown>("DELETE", `/api/admin/promos/${id}`),
+
+  majLivraison: (regions: DeliveryRegion[]) =>
+    envoyerMethode<{ items: DeliveryRegion[] }>("PUT", "/api/admin/livraison", { regions }).then(
+      (r) => r.items,
+    ),
+
+  majContenu: (contenu: SiteContent) =>
+    envoyerMethode<SiteContent>("PUT", "/api/admin/contenu", contenu),
+
+  /**
+   * Demande l'autorisation d'envoyer une image, puis la téléverse directement au
+   * stockage. Le fichier ne passe pas par l'API : une photo de plusieurs mégaoctets
+   * n'a rien à faire dans sa mémoire.
+   */
+  televerserImage: async (fichier: File): Promise<string> => {
+    const { url, chemin } = await envoyer<{ url: string; chemin: string }>(
+      "/api/admin/images/televersement",
+      { contentType: fichier.type, taille: fichier.size },
+    );
+
+    const envoi = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": fichier.type },
+      body: fichier,
+    });
+    if (!envoi.ok) throw new ErreurApi("Le téléversement de l'image a échoué.", envoi.status);
+
+    return chemin;
+  },
 
   /**
    * Recherche une commande. Le téléphone est exigé pour un visiteur non connecté :

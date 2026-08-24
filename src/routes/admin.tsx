@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import { formatDate, formatFcfa } from "@/lib/format";
+import { api } from "@/lib/api";
 import { newId, statusLabels, useStore } from "@/lib/store";
 import type { Category, DeliveryRegion, OrderStatus, Product, PromoCode } from "@/data/types";
 
@@ -48,6 +49,22 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
+
+/**
+ * Exécute une écriture et signale son échec.
+ *
+ * Les mutations passent désormais par le serveur : elles peuvent être refusées — un
+ * produit encore vendu, une catégorie non vide, une session expirée. Sans ce garde-fou,
+ * l'échec resterait invisible et l'écran donnerait l'illusion d'avoir enregistré.
+ */
+async function enregistrer(action: () => Promise<void>, succes: string): Promise<void> {
+  try {
+    await action();
+    toast.success(succes);
+  } catch (erreur) {
+    toast.error(erreur instanceof Error ? erreur.message : "Enregistrement impossible.");
+  }
+}
 
 function Admin() {
   const store = useStore();
@@ -319,7 +336,12 @@ function Orders() {
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <select
                 value={o.status}
-                onChange={(e) => setOrderStatus(o.id, e.target.value as OrderStatus)}
+                onChange={(e) =>
+                  void enregistrer(
+                    () => setOrderStatus(o.id, e.target.value as OrderStatus),
+                    "Statut mis à jour",
+                  )
+                }
                 className="h-9 border border-input bg-background px-3 text-sm"
                 aria-label="Statut"
               >
@@ -333,14 +355,24 @@ function Orders() {
                 <input
                   type="checkbox"
                   checked={o.paid}
-                  onChange={(e) => updateOrder(o.id, { paid: e.target.checked })}
+                  onChange={(e) =>
+                    void enregistrer(
+                      () => updateOrder(o.id, { paid: e.target.checked }),
+                      "Encaissement enregistré",
+                    )
+                  }
                 />
                 Encaissement confirmé
               </label>
               <Input
                 defaultValue={o.internalNote ?? ""}
                 placeholder="Note interne"
-                onBlur={(e) => updateOrder(o.id, { internalNote: e.target.value })}
+                onBlur={(e) =>
+                  void enregistrer(
+                    () => updateOrder(o.id, { internalNote: e.target.value }),
+                    "Note enregistrée",
+                  )
+                }
                 className="h-9 max-w-xs rounded-none"
               />
             </div>
@@ -376,6 +408,8 @@ const emptyProduct = (): Product => ({
 
 function Products() {
   const { products, categories, saveProduct, deleteProduct } = useStore();
+  const [envoiImages, setEnvoiImages] = useState(false);
+  const [enregistrement, setEnregistrement] = useState(false);
   const [draft, setDraft] = useState<Product | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
@@ -385,10 +419,12 @@ function Products() {
       toast.error("Nom et catégorie obligatoires.");
       return;
     }
-    saveProduct({ ...draft, slug: slugify(draft.name) });
+    void enregistrer(
+      () => saveProduct({ ...draft, slug: slugify(draft.name) }),
+      "Produit enregistré",
+    );
 
     setDraft(null);
-    toast.success("Produit enregistré");
   };
 
   return (
@@ -425,8 +461,9 @@ function Products() {
             </select>
           </div>
           <div>
-            <Label>Prix (FCFA)</Label>
+            <Label htmlFor="prix">Prix (FCFA)</Label>
             <Input
+              id="prix"
               type="number"
               value={draft.price}
               onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) })}
@@ -458,22 +495,28 @@ function Products() {
               accept="image/*"
               multiple
               onChange={async (e) => {
-                const files = Array.from(e.target.files ?? []);
-                if (!files.length) return;
-                const urls = await Promise.all(
-                  files.map(
-                    (file) =>
-                      new Promise<string>((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(String(reader.result));
-                        reader.onerror = () => reject(reader.error);
-                        reader.readAsDataURL(file);
-                      }),
-                  ),
-                );
-                setDraft((d) => ({ ...d!, images: [...d!.images, ...urls] }));
+                const fichiers = Array.from(e.target.files ?? []);
+                if (!fichiers.length) return;
                 e.target.value = "";
+
+                // Envoi direct au stockage, une image à la fois pour ne pas saturer
+                // une connexion mobile. L'encodage en base64 précédent gonflait la
+                // page d'un tiers et ne survivait pas au rechargement.
+                setEnvoiImages(true);
+                try {
+                  for (const fichier of fichiers) {
+                    const chemin = await api.televerserImage(fichier);
+                    setDraft((d) => ({ ...d!, images: [...d!.images, chemin] }));
+                  }
+                } catch (erreur) {
+                  toast.error(
+                    erreur instanceof Error ? erreur.message : "Téléversement impossible.",
+                  );
+                } finally {
+                  setEnvoiImages(false);
+                }
               }}
+              disabled={envoiImages}
               className="mt-1.5 rounded-none"
             />
             {draft.images.length > 0 && (
@@ -590,8 +633,7 @@ function Products() {
                   </button>
                   <button
                     onClick={() => {
-                      deleteProduct(p.id);
-                      toast.success("Produit supprimé");
+                      void enregistrer(() => deleteProduct(p.id), "Produit supprimé");
                     }}
                     className="text-destructive underline"
                   >
@@ -629,7 +671,12 @@ function Stock() {
                 <Input
                   type="number"
                   value={p.stock}
-                  onChange={(e) => saveProduct({ ...p, stock: Number(e.target.value) })}
+                  onChange={(e) =>
+                    void enregistrer(
+                      () => saveProduct({ ...p, stock: Number(e.target.value) }),
+                      "Stock mis à jour",
+                    )
+                  }
                   className="h-9 w-24 rounded-none"
                 />
               </td>
@@ -637,7 +684,12 @@ function Stock() {
                 <Input
                   type="number"
                   value={p.lowStockThreshold}
-                  onChange={(e) => saveProduct({ ...p, lowStockThreshold: Number(e.target.value) })}
+                  onChange={(e) =>
+                    void enregistrer(
+                      () => saveProduct({ ...p, lowStockThreshold: Number(e.target.value) }),
+                      "Seuil mis à jour",
+                    )
+                  }
                   className="h-9 w-24 rounded-none"
                 />
               </td>
@@ -706,10 +758,9 @@ function Categories() {
                   toast.error("Nom obligatoire.");
                   return;
                 }
-                saveCategory({ ...draft, slug });
+                void enregistrer(() => saveCategory({ ...draft, slug }), "Catégorie enregistrée");
 
                 setDraft(null);
-                toast.success("Catégorie enregistrée");
               }}
               className="btn-square btn-solid"
             >
@@ -735,7 +786,10 @@ function Categories() {
               <button onClick={() => setDraft(c)} className="mr-3 underline">
                 Modifier
               </button>
-              <button onClick={() => deleteCategory(c.id)} className="text-destructive underline">
+              <button
+                onClick={() => void enregistrer(() => deleteCategory(c.id), "Catégorie supprimée")}
+                className="text-destructive underline"
+              >
                 Supprimer
               </button>
             </div>
@@ -855,9 +909,8 @@ function Promos() {
                   toast.error("Le code est obligatoire.");
                   return;
                 }
-                savePromo(draft);
+                void enregistrer(() => savePromo(draft), "Code promo enregistré");
                 setDraft(null);
-                toast.success("Code promo enregistré");
               }}
               className="btn-square btn-solid"
             >
@@ -903,7 +956,10 @@ function Promos() {
                   <button onClick={() => setDraft(p)} className="mr-3 underline">
                     Modifier
                   </button>
-                  <button onClick={() => deletePromo(p.id)} className="text-destructive underline">
+                  <button
+                    onClick={() => void enregistrer(() => deletePromo(p.id), "Code supprimé")}
+                    className="text-destructive underline"
+                  >
                     Supprimer
                   </button>
                 </td>
@@ -925,8 +981,9 @@ function ContentTab() {
       <section className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-2">
         <h2 className="font-display text-xl sm:col-span-2">Bannière & coordonnées</h2>
         <div>
-          <Label>Titre bannière</Label>
+          <Label htmlFor="banniere-titre">Titre bannière</Label>
           <Input
+            id="banniere-titre"
             value={draft.bannerTitle}
             onChange={(e) => setDraft({ ...draft, bannerTitle: e.target.value })}
             className="mt-1.5 rounded-none"
@@ -1011,8 +1068,7 @@ function ContentTab() {
 
       <button
         onClick={() => {
-          setContent(draft);
-          toast.success("Contenu du site mis à jour");
+          void enregistrer(() => setContent(draft), "Contenu du site mis à jour");
         }}
         className="bg-primary px-6 py-3 text-sm text-primary-foreground"
       >
@@ -1028,7 +1084,10 @@ function Delivery() {
   const [areaDraft, setAreaDraft] = useState<Record<string, { name: string; fee: string }>>({});
 
   const update = (regionId: string, fn: (r: DeliveryRegion) => DeliveryRegion) =>
-    setRegions(regions.map((r) => (r.id === regionId ? fn(r) : r)));
+    void enregistrer(
+      () => setRegions(regions.map((r) => (r.id === regionId ? fn(r) : r))),
+      "Zones enregistrées",
+    );
 
   return (
     <div className="space-y-8">
@@ -1040,9 +1099,13 @@ function Delivery() {
             e.preventDefault();
             const name = newRegion.trim();
             if (!name) return;
-            setRegions([...regions, { id: newId("reg"), name, areas: [] }]);
+            // L'identifiant local est provisoire : le serveur en attribue un vrai et
+            // renvoie la liste, que le store remplace.
+            void enregistrer(
+              () => setRegions([...regions, { id: newId("reg"), name, areas: [] }]),
+              "Région ajoutée",
+            );
             setNewRegion("");
-            toast.success("Région ajoutée");
           }}
         >
           <Input
@@ -1069,8 +1132,10 @@ function Delivery() {
               />
               <button
                 onClick={() => {
-                  setRegions(regions.filter((reg) => reg.id !== r.id));
-                  toast.success("Région supprimée");
+                  void enregistrer(
+                    () => setRegions(regions.filter((reg) => reg.id !== r.id)),
+                    "Région supprimée",
+                  );
                 }}
                 className="border border-border px-4 py-2 text-sm transition-colors hover:bg-muted"
               >
