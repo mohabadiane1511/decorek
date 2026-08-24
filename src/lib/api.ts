@@ -174,6 +174,14 @@ export const api = {
       callbackURL: "/compte",
     }),
 
+  /**
+   * Recherche une commande. Le téléphone est exigé pour un visiteur non connecté :
+   * les numéros se suivent, et sans cette seconde information n'importe qui pourrait
+   * consulter les coordonnées d'autres clients.
+   */
+  suivreCommande: (numero: string, telephone?: string) =>
+    envoyer<Order>("/api/commandes/suivi", { numero, telephone }),
+
   /** Demande un lien de réinitialisation du mot de passe. */
   reinitialiserMotDePasse: (email: string) =>
     envoyer<unknown>("/api/auth/request-password-reset", {

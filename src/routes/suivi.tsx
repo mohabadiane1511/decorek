@@ -4,6 +4,8 @@ import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { Input } from "@/components/ui/input";
 import { OrderTimeline } from "@/components/shop/OrderTimeline";
 import { formatFcfa, formatDate } from "@/lib/format";
+import type { Order } from "@/data/types";
+import { api } from "@/lib/api";
 import { statusLabels, useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/suivi")({
@@ -23,10 +25,29 @@ export const Route = createFileRoute("/suivi")({
 });
 
 function Suivi() {
-  const { orders } = useStore();
+  const { user } = useStore();
   const [q, setQ] = useState("");
-  const [searched, setSearched] = useState(false);
-  const order = orders.find((o) => o.number.toLowerCase() === q.trim().toLowerCase());
+  const [telephone, setTelephone] = useState("");
+  const [order, setOrder] = useState<Order | null>(null);
+  const [erreur, setErreur] = useState("");
+  const [enCours, setEnCours] = useState(false);
+
+  const rechercher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!q.trim()) return;
+
+    setEnCours(true);
+    setErreur("");
+    try {
+      const trouvee = await api.suivreCommande(q.trim(), telephone.trim() || undefined);
+      setOrder(trouvee);
+    } catch (e) {
+      setOrder(null);
+      setErreur(e instanceof Error ? e.message : "Recherche impossible.");
+    } finally {
+      setEnCours(false);
+    }
+  };
 
   return (
     <ShopLayout>
@@ -35,23 +56,35 @@ function Suivi() {
         intro="Entrez le numéro reçu à la validation (format DR-XXXX-XXXX)."
       />
       <div className="mx-auto max-w-2xl px-4 pb-20">
-        <div className="flex gap-2">
+        <form onSubmit={(e) => void rechercher(e)} className="space-y-3">
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="DR-2608-1042"
+            aria-label="Numéro de commande"
             className="rounded-none"
           />
-          <button onClick={() => setSearched(true)} className="btn-square btn-solid">
-            Rechercher
+          {/* Le téléphone n'est demandé qu'aux visiteurs non connectés : un client
+              identifié accède directement à ses propres commandes. */}
+          {!user && (
+            <Input
+              value={telephone}
+              onChange={(e) => setTelephone(e.target.value)}
+              placeholder="Téléphone utilisé lors de la commande"
+              aria-label="Téléphone"
+              className="rounded-none"
+            />
+          )}
+          <button
+            type="submit"
+            disabled={enCours}
+            className="btn-square btn-solid w-full disabled:opacity-50"
+          >
+            {enCours ? "Recherche…" : "Rechercher"}
           </button>
-        </div>
+        </form>
 
-        {searched && !order && (
-          <p className="mt-8 text-sm text-muted-foreground">
-            Aucune commande ne correspond à ce numéro.
-          </p>
-        )}
+        {erreur && <p className="mt-8 text-sm text-muted-foreground">{erreur}</p>}
 
         {order && (
           <div className="mt-10 border border-border p-6">
