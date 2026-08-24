@@ -27,6 +27,10 @@ const schemaConfig = z.object({
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
   S3_BUCKET: z.string().min(1),
+  // Endpoint joignable depuis le navigateur. En développement, MinIO exposé sur le
+  // poste ; en production, le domaine public. Les URL de téléversement sont signées
+  // pour cette adresse : les signer pour le nom interne les rendrait inutilisables.
+  S3_PUBLIC_ENDPOINT: z.string().min(1).default("http://localhost:59000"),
   MEDIA_PREFIX: z.string().default("/media"),
 });
 

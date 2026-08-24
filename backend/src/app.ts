@@ -92,7 +92,7 @@ export function creerApp({ config, prisma, cache, redis, auth, courrier }: Depen
   app.route("/api", routesContenu(prisma, cache));
   app.route("/api", routesCommandes(prisma, cache, auth, courrier, config));
   app.route("/api", routesSuivi(prisma, auth, redis));
-  app.route("/api", routesAdmin(prisma, cache, auth));
+  app.route("/api", routesAdmin(prisma, cache, auth, config));
 
   // Routes de diagnostic : jamais montées en production. Elles servent aux tests du
   // contrat d'erreur, mais /api/boom offrirait sinon un moyen commode de polluer les

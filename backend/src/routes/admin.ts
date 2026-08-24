@@ -7,6 +7,13 @@ import type { Cache } from "../cache.js";
 import { ErreurApi, corpsErreur } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { reconcilierStock } from "../stock.js";
+import type { Config } from "../config.js";
+import {
+  configStockageDepuis,
+  preparerTeleversement,
+  TAILLE_IMAGE_MAX,
+  TYPES_IMAGE_AUTORISES,
+} from "../storage.js";
 import { versContenu } from "./contenu.js";
 import { versProduit } from "./catalogue.js";
 
@@ -109,7 +116,12 @@ function validation<T extends z.ZodTypeAny>(schema: T) {
   });
 }
 
-export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth): Hono {
+const schemaTeleversement = z.object({
+  contentType: z.string().min(1).max(80),
+  taille: z.coerce.number().int().positive(),
+});
+
+export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, config: Config): Hono {
   const routes = new Hono();
 
   // Une seule garde pour tout le préfixe : ajouter un endpoint ici ne peut pas
@@ -118,6 +130,30 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth): Hon
 
   /** Toute écriture périme le catalogue public. */
   const invalider = () => cache.invaliderCatalogue();
+
+  // ---------------------------------------------------------------- Images
+
+  routes.post("/admin/images/televersement", validation(schemaTeleversement), async (c) => {
+    const { contentType, taille } = c.req.valid("json");
+
+    // Type et poids vérifiés avant d'émettre l'autorisation : une fois l'URL signée
+    // remise, le serveur n'a plus la main sur ce qui est envoyé.
+    if (!TYPES_IMAGE_AUTORISES.includes(contentType)) {
+      throw new ErreurApi(
+        "VALIDATION",
+        "Format non accepté. Utilisez une image JPEG, PNG, WebP ou AVIF.",
+      );
+    }
+    if (taille > TAILLE_IMAGE_MAX) {
+      throw new ErreurApi(
+        "VALIDATION",
+        `Image trop lourde (${Math.round(taille / 1024 / 1024)} Mo). Maximum ${TAILLE_IMAGE_MAX / 1024 / 1024} Mo.`,
+      );
+    }
+
+    const prepare = await preparerTeleversement(configStockageDepuis(config), contentType);
+    return c.json(prepare);
+  });
 
   // ---------------------------------------------------------------- Produits
 

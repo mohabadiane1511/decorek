@@ -54,6 +54,9 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER manquant}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD manquant}
+      # Le navigateur téléverse directement ici, depuis le domaine du site : sans cette
+      # autorisation d'origine, chaque envoi serait bloqué. Restreint au site, jamais *.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${AUTH_URL:-http://localhost:8080}
     volumes:
       - storage-data:/data
     healthcheck:
@@ -141,6 +144,9 @@ services:
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       S3_BUCKET: ${MINIO_BUCKET:-decorek-media}
+      # Adresse que le navigateur peut joindre : les URL de téléversement sont
+      # signées pour celle-ci, pas pour le nom interne du service.
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:59000}
       MEDIA_PREFIX: /media
     healthcheck:
       # Interroge la route qui vérifie réellement la base, pas un simple ping TCP.
