@@ -6,6 +6,7 @@ const schemaConfig = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL est requise"),
+  REDIS_URL: z.string().min(1, "REDIS_URL est requise"),
   S3_ENDPOINT: z.string().min(1),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),

@@ -3,7 +3,10 @@ import { logger } from "hono/logger";
 import { requestId } from "hono/request-id";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
+import type { Redis } from "ioredis";
+import type { Cache } from "./cache.js";
 import type { Config } from "./config.js";
+import { limiter } from "./limite.js";
 import { ErreurApi, corpsErreur, gererErreur } from "./erreurs.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { routesCatalogue } from "./routes/catalogue.js";
@@ -12,9 +15,11 @@ import { routesContenu } from "./routes/contenu.js";
 export type Dependances = {
   config: Config;
   prisma: PrismaClient;
+  cache: Cache;
+  redis: Redis;
 };
 
-export function creerApp({ config, prisma }: Dependances): Hono {
+export function creerApp({ config, prisma, cache, redis }: Dependances): Hono {
   const app = new Hono();
 
   app.use("*", requestId());
@@ -38,8 +43,8 @@ export function creerApp({ config, prisma }: Dependances): Hono {
     return c.json({ status: "ok" as const, database: "ok" as const });
   });
 
-  app.route("/api", routesCatalogue(prisma));
-  app.route("/api", routesContenu(prisma));
+  app.route("/api", routesCatalogue(prisma, cache));
+  app.route("/api", routesContenu(prisma, cache));
 
   // Routes de diagnostic : jamais montées en production. Elles servent aux tests du
   // contrat d'erreur, mais /api/boom offrirait sinon un moyen commode de polluer les
@@ -70,6 +75,12 @@ export function creerApp({ config, prisma }: Dependances): Hono {
     app.get("/api/_diag/introuvable", () => {
       throw new ErreurApi("INTROUVABLE", "Produit introuvable.");
     });
+
+    // Permet d'éprouver la limitation de débit en conditions réelles avant qu'elle ne
+    // protège la connexion (lot 10) et le suivi de commande (lot 14).
+    app.get("/api/_diag/limite", limiter(redis, "diag", { max: 3, fenetreSecondes: 10 }), (c) =>
+      c.json({ ok: true }),
+    );
   }
 
   return app;

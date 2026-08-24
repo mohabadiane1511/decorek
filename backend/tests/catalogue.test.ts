@@ -1,12 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
 import type { Product } from "../../src/data/types.js";
-import { creerApp } from "../src/app.js";
-import { lireConfig } from "../src/config.js";
-import { creerClient } from "../src/db.js";
+import { creerContexte, type ContexteTest } from "./contexte.js";
 import { semer } from "../prisma/seed.js";
 import type { PrismaClient } from "../src/generated/prisma/client.js";
 
+let contexte: ContexteTest;
 let app: Hono;
 let prisma: PrismaClient;
 const url = process.env["TEST_DATABASE_URL"]!;
@@ -20,18 +19,16 @@ async function lister(requete: string): Promise<Liste> {
 }
 
 beforeAll(async () => {
-  prisma = creerClient(url);
+  contexte = creerContexte();
+  ({ app, prisma } = contexte);
   await prisma.productImage.deleteMany();
   await prisma.product.deleteMany();
   await prisma.category.deleteMany();
   await semer(url);
-
-  const config = lireConfig({ ...process.env, NODE_ENV: "test", DATABASE_URL: url });
-  app = creerApp({ config, prisma });
 }, 120_000);
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  await contexte.fermer();
 });
 
 describe("liste des produits", () => {

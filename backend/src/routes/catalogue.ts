@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { Category, Product } from "../../../src/data/types.js";
+import type { Cache } from "../cache.js";
 import { ErreurApi, corpsErreur } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 
@@ -61,7 +62,11 @@ const schemaListe = z.object({
 
 const inclureImages = { images: { orderBy: { position: "asc" } } } as const;
 
-export function routesCatalogue(prisma: PrismaClient): Hono {
+// Le catalogue change rarement et l'invalidation est explicite : ce délai n'est qu'un
+// filet, pour qu'un oubli d'invalidation se résorbe de lui-même.
+const TTL_CATALOGUE = 300;
+
+export function routesCatalogue(prisma: PrismaClient, cache: Cache): Hono {
   const routes = new Hono();
 
   routes.get(
@@ -93,45 +98,54 @@ export function routesCatalogue(prisma: PrismaClient): Hono {
             ? ({ price: "desc" } as const)
             : ({ createdAt: "desc" } as const);
 
-      // Compte et page dans la même requête : deux appels séparés pourraient renvoyer un
-      // total incohérent avec la page si le catalogue change entre les deux.
-      const [total, produits] = await prisma.$transaction([
-        prisma.product.count({ where }),
-        prisma.product.findMany({
-          where,
-          orderBy,
-          include: inclureImages,
-          skip: (page - 1) * parPage,
-          take: parPage,
-        }),
-      ]);
+      const cle = `produits:${categorie ?? ""}:${q ?? ""}:${prixMax ?? ""}:${tri}:${page}:${parPage}`;
+      const resultat = await cache.lireOuCharger(cle, TTL_CATALOGUE, async () => {
+        // Compte et page dans la même transaction : deux appels séparés pourraient
+        // renvoyer un total incohérent avec la page si le catalogue change entre les deux.
+        const [total, produits] = await prisma.$transaction([
+          prisma.product.count({ where }),
+          prisma.product.findMany({
+            where,
+            orderBy,
+            include: inclureImages,
+            skip: (page - 1) * parPage,
+            take: parPage,
+          }),
+        ]);
 
-      return c.json({
-        items: produits.map(versProduit),
-        total,
-        page,
-        pages: Math.max(1, Math.ceil(total / parPage)),
+        return {
+          items: produits.map(versProduit),
+          total,
+          page,
+          pages: Math.max(1, Math.ceil(total / parPage)),
+        };
       });
+
+      return c.json(resultat);
     },
   );
 
   routes.get("/produits/:slug", async (c) => {
-    const produit = await prisma.product.findUnique({
-      where: { slug: c.req.param("slug") },
-      include: inclureImages,
-    });
+    const slug = c.req.param("slug");
+    const produit = await cache.lireOuCharger(`produit:${slug}`, TTL_CATALOGUE, () =>
+      prisma.product.findUnique({ where: { slug }, include: inclureImages }),
+    );
     if (!produit) throw new ErreurApi("INTROUVABLE", "Produit introuvable.");
-    return c.json(versProduit(produit));
+    // Le cache stocke du JSON : createdAt revient en chaîne après un aller-retour, d'où
+    // la reconstruction de la date avant conversion.
+    return c.json(versProduit({ ...produit, createdAt: new Date(produit.createdAt) }));
   });
 
   routes.get("/categories", async (c) => {
-    const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
-    const items: Category[] = categories.map((cat) => ({
-      id: cat.id,
-      slug: cat.slug,
-      name: cat.name,
-      description: cat.description,
-    }));
+    const items = await cache.lireOuCharger<Category[]>("categories", TTL_CATALOGUE, async () => {
+      const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
+      return categories.map((cat) => ({
+        id: cat.id,
+        slug: cat.slug,
+        name: cat.name,
+        description: cat.description,
+      }));
+    });
     return c.json({ items });
   });
 

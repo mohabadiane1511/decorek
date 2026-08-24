@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
 import { config as loadEnv } from "dotenv";
+import { Redis } from "ioredis";
 import { creerApp } from "./app.js";
+import { creerCache } from "./cache.js";
 import { lireConfig } from "./config.js";
 import { creerClient } from "./db.js";
 
@@ -10,7 +12,13 @@ loadEnv({ path: new URL("../.env", import.meta.url).pathname, quiet: true });
 
 const config = lireConfig();
 const prisma = creerClient(config.DATABASE_URL);
-const app = creerApp({ config, prisma });
+const cache = creerCache(config.REDIS_URL);
+const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 1, enableOfflineQueue: false });
+redis.on("error", () => {
+  // Journalisé par le cache : inutile de doubler le bruit. Sans écouteur, ioredis
+  // ferait tomber le processus sur une erreur de connexion.
+});
+const app = creerApp({ config, prisma, cache, redis });
 
 const serveur = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   console.log(`API Deco'Rek à l'écoute sur le port ${info.port} (${config.NODE_ENV})`);
@@ -21,7 +29,9 @@ const serveur = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     serveur.close(() => {
-      void prisma.$disconnect().then(() => process.exit(0));
+      void Promise.allSettled([prisma.$disconnect(), cache.fermer(), redis.quit()]).then(() =>
+        process.exit(0),
+      );
     });
   });
 }

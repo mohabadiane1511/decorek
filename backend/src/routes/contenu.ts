@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import type { DeliveryRegion, SiteContent } from "../../../src/data/types.js";
+import type { Cache } from "../cache.js";
 import { ErreurApi } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+
+// Contenu et zones changent encore moins souvent que le catalogue, et l'administration
+// les invalide explicitement.
+const TTL_CONTENU = 600;
 
 type ContenuEnBase = {
   bannerTitle: string;
@@ -41,11 +46,13 @@ export function versContenu(c: ContenuEnBase): SiteContent {
   };
 }
 
-export function routesContenu(prisma: PrismaClient): Hono {
+export function routesContenu(prisma: PrismaClient, cache: Cache): Hono {
   const routes = new Hono();
 
   routes.get("/contenu", async (c) => {
-    const contenu = await prisma.siteContent.findUnique({ where: { id: 1 } });
+    const contenu = await cache.lireOuCharger("contenu", TTL_CONTENU, () =>
+      prisma.siteContent.findUnique({ where: { id: 1 } }),
+    );
     if (!contenu) {
       // Échouer bruyamment plutôt que servir des valeurs par défaut : sans ce contenu,
       // le site afficherait un numéro WhatsApp vide et une livraison offerte à partir
@@ -56,16 +63,21 @@ export function routesContenu(prisma: PrismaClient): Hono {
   });
 
   routes.get("/livraison", async (c) => {
-    const regions = await prisma.deliveryRegion.findMany({
-      orderBy: { name: "asc" },
-      include: { areas: { orderBy: { name: "asc" } } },
-    });
-
-    const items: DeliveryRegion[] = regions.map((r) => ({
-      id: r.id,
-      name: r.name,
-      areas: r.areas.map((a) => ({ id: a.id, name: a.name, fee: a.fee })),
-    }));
+    const items = await cache.lireOuCharger<DeliveryRegion[]>(
+      "livraison",
+      TTL_CONTENU,
+      async () => {
+        const regions = await prisma.deliveryRegion.findMany({
+          orderBy: { name: "asc" },
+          include: { areas: { orderBy: { name: "asc" } } },
+        });
+        return regions.map((r) => ({
+          id: r.id,
+          name: r.name,
+          areas: r.areas.map((a) => ({ id: a.id, name: a.name, fee: a.fee })),
+        }));
+      },
+    );
     return c.json({ items });
   });
 

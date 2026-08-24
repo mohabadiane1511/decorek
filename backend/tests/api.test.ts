@@ -4,21 +4,19 @@ import { creerApp } from "../src/app.js";
 import { lireConfig } from "../src/config.js";
 import { creerClient } from "../src/db.js";
 import type { PrismaClient } from "../src/generated/prisma/client.js";
+import { creerContexte, type ContexteTest } from "./contexte.js";
 
+let contexte: ContexteTest;
 let app: Hono;
 let prisma: PrismaClient;
 
 beforeAll(() => {
-  const url = process.env["TEST_DATABASE_URL"]!;
-  prisma = creerClient(url);
-  // On passe par la vraie lecture de configuration : si le contrat des variables
-  // d'environnement casse, les tests doivent le voir aussi.
-  const config = lireConfig({ ...process.env, NODE_ENV: "test", DATABASE_URL: url });
-  app = creerApp({ config, prisma });
+  contexte = creerContexte();
+  ({ app, prisma } = contexte);
 });
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  await contexte.fermer();
 });
 
 describe("contrôle de santé", () => {
@@ -32,8 +30,17 @@ describe("contrôle de santé", () => {
     // Un contrôle de santé qui ignore ses dépendances laisserait l'orchestrateur
     // envoyer du trafic à un service incapable de répondre.
     const prismaCasse = creerClient("postgresql://absent:absent@127.0.0.1:1/absente");
-    const config = lireConfig({ ...process.env, NODE_ENV: "test" });
-    const appCassee = creerApp({ config, prisma: prismaCasse });
+    const config = lireConfig({
+      ...process.env,
+      NODE_ENV: "test",
+      REDIS_URL: process.env["TEST_REDIS_URL"]!,
+    });
+    const appCassee = creerApp({
+      config,
+      prisma: prismaCasse,
+      cache: contexte.cache,
+      redis: contexte.redis,
+    });
 
     const reponse = await appCassee.request("/api/health");
     expect(reponse.status).toBe(503);
@@ -91,10 +98,21 @@ describe("routes de diagnostic", () => {
       ...process.env,
       NODE_ENV: "production",
       DATABASE_URL: process.env["TEST_DATABASE_URL"]!,
+      REDIS_URL: process.env["TEST_REDIS_URL"]!,
     });
-    const appProd = creerApp({ config, prisma });
+    const appProd = creerApp({
+      config,
+      prisma,
+      cache: contexte.cache,
+      redis: contexte.redis,
+    });
 
-    for (const route of ["/api/_diag/echo?n=1", "/api/_diag/boom", "/api/_diag/introuvable"]) {
+    for (const route of [
+      "/api/_diag/echo?n=1",
+      "/api/_diag/boom",
+      "/api/_diag/introuvable",
+      "/api/_diag/limite",
+    ]) {
       expect((await appProd.request(route)).status, route).toBe(404);
     }
     // Le contrôle de santé, lui, reste indispensable en production.

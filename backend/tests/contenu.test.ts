@@ -2,29 +2,28 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Hono } from "hono";
 import type { DeliveryRegion, SiteContent } from "../../src/data/types.js";
 import { seedContent, seedRegions } from "../../src/data/seed.js";
-import { creerApp } from "../src/app.js";
-import { lireConfig } from "../src/config.js";
-import { creerClient } from "../src/db.js";
+import { creerContexte, type ContexteTest } from "./contexte.js";
 import { semer } from "../prisma/seed.js";
 import type { PrismaClient } from "../src/generated/prisma/client.js";
 
+let contexte: ContexteTest;
 let app: Hono;
 let prisma: PrismaClient;
 const url = process.env["TEST_DATABASE_URL"]!;
 
 beforeAll(async () => {
-  prisma = creerClient(url);
+  contexte = creerContexte();
+  ({ app, prisma } = contexte);
   await prisma.deliveryArea.deleteMany();
   await prisma.deliveryRegion.deleteMany();
   await prisma.siteContent.deleteMany();
   await semer(url);
-
-  const config = lireConfig({ ...process.env, NODE_ENV: "test", DATABASE_URL: url });
-  app = creerApp({ config, prisma });
+  // Les autres fichiers de test partagent ce cache : on repart d'entrées neuves.
+  await contexte.redis.flushdb();
 }, 120_000);
 
 afterAll(async () => {
-  await prisma.$disconnect();
+  await contexte.fermer();
 });
 
 describe("contenu du site", () => {
@@ -44,6 +43,9 @@ describe("contenu du site", () => {
 
   it("signale explicitement un contenu manquant au lieu de servir du vide", async () => {
     await prisma.siteContent.deleteMany();
+    // Sans invalidation, le cache continuerait de servir l'ancien contenu : c'est
+    // précisément le geste que l'administration devra faire après chaque écriture.
+    await contexte.cache.invaliderCatalogue();
     try {
       const reponse = await app.request("/api/contenu");
       // Sans contenu, le site annoncerait une livraison offerte dès 0 FCFA et un
@@ -53,6 +55,7 @@ describe("contenu du site", () => {
       expect(corps.error.message).toMatch(/db:seed/);
     } finally {
       await semer(url);
+      await contexte.cache.invaliderCatalogue();
     }
   }, 120_000);
 });
