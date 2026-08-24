@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SqueletteAccueil } from "@/components/shop/Squelettes";
 import { useStore } from "@/lib/store";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
@@ -13,11 +14,9 @@ import { WhatsAppButton } from "./WhatsAppButton";
  * page blanche.
  */
 function Chargement() {
-  return (
-    <div className="flex flex-1 items-center justify-center px-4 py-24">
-      <p className="label-mono text-muted-foreground">Chargement de la boutique…</p>
-    </div>
-  );
+  // Silhouette plutôt qu'un texte : sur une connexion lente, une page qui prend forme
+  // paraît plus rapide qu'un écran vide, même à durée égale.
+  return <SqueletteAccueil />;
 }
 
 function Indisponible({ message, reessayer }: { message: string; reessayer: () => void }) {

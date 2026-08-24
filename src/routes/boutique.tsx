@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { ProductCard } from "@/components/shop/ProductCard";
+import { SqueletteGrilleProduits } from "@/components/shop/Squelettes";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { api, type FiltresProduits } from "@/lib/api";
@@ -183,7 +184,7 @@ function Boutique() {
             </button>
           </div>
         ) : isPending ? (
-          <p className="label-mono py-20 text-center text-muted-foreground">Chargement…</p>
+          <SqueletteGrilleProduits nombre={PAGE_SIZE} />
         ) : data.items.length === 0 ? (
           <p className="py-20 text-center text-muted-foreground">
             Aucun article ne correspond à votre recherche.

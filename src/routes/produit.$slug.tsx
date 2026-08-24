@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ShopLayout } from "@/components/layout/ShopLayout";
 import { ProductCard } from "@/components/shop/ProductCard";
+import { SqueletteFicheProduit } from "@/components/shop/Squelettes";
 import { formatFcfa } from "@/lib/format";
 import { useQuery } from "@tanstack/react-query";
 import { api, ErreurApi as ErreurApiClient } from "@/lib/api";
@@ -63,9 +64,7 @@ function ProductPage() {
   if (isPending) {
     return (
       <ShopLayout>
-        <p className="label-mono py-24 text-center text-muted-foreground">
-          Chargement de l'article…
-        </p>
+        <SqueletteFicheProduit />
       </ShopLayout>
     );
   }
