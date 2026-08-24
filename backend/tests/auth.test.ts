@@ -244,3 +244,35 @@ describe("protection contre le bourrinage", () => {
     expect(statuts.filter((s) => s === 429).length).toBeGreaterThan(0);
   }, 60_000);
 });
+
+describe("lien magique", () => {
+  async function demanderLien(email: string): Promise<Response> {
+    return contexte.app.request("/api/auth/sign-in/magic-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, callbackURL: "/compte" }),
+    });
+  }
+
+  it("n'inscrit personne et n'écrit à personne pour une adresse inconnue", async () => {
+    const reponse = await demanderLien("jamais-vu@test.sn");
+
+    // Réponse identique à celle d'une adresse connue : dire « inconnue » permettrait
+    // de découvrir qui est client de la boutique.
+    expect(reponse.status).toBe(200);
+    // Mais aucun compte n'est créé. Sans ce filtre, on pourrait aussi faire envoyer un
+    // e-mail au nom de la boutique à n'importe quelle adresse saisie.
+    expect(await contexte.prisma.user.count({ where: { email: "jamais-vu@test.sn" } })).toBe(0);
+  });
+
+  it("répond pareil pour une adresse connue", async () => {
+    await inscrire(CLIENT);
+    await confirmerAdresse(CLIENT.email);
+
+    const connue = await demanderLien(CLIENT.email);
+    const inconnue = await demanderLien("autre-inconnue@test.sn");
+
+    expect(connue.status).toBe(inconnue.status);
+    expect(await connue.text()).toBe(await inconnue.text());
+  });
+});

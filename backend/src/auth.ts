@@ -83,6 +83,20 @@ export function creerAuth(prisma: PrismaClient, redis: Redis, config: Config, co
       // Connexion sans mot de passe : utile pour une clientèle qui commande rarement et
       // oublie ses identifiants entre deux achats.
       magicLink({
+        // Le lien magique connecte, il n'inscrit pas. Par défaut, Better Auth crée un
+        // compte pour une adresse inconnue : trois raisons de le refuser ici.
+        //
+        // D'abord, cela permettrait d'envoyer un e-mail au nom de la boutique à
+        // n'importe quelle adresse saisie — un moyen commode d'importuner quelqu'un et
+        // d'abîmer la réputation d'envoi du domaine.
+        //
+        // Ensuite, le compte ainsi créé n'aurait ni nom ni mot de passe, contournant
+        // le formulaire d'inscription et sa confirmation.
+        //
+        // Enfin, l'écran annonce « si un compte existe » : créer ce compte rendrait
+        // cette phrase fausse.
+        disableSignUp: true,
+
         sendMagicLink: async ({ email, url }) => {
           const { texte, html } = rendre({
             surtitre: "Connexion",

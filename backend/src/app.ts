@@ -70,6 +70,32 @@ export function creerApp({ config, prisma, cache, redis, auth, courrier }: Depen
     ],
     limiter(redis, "auth", { max: 20, fenetreSecondes: 60 }),
   );
+  /**
+   * Filtre les demandes de lien magique visant une adresse inconnue.
+   *
+   * `disableSignUp` empêche bien la création du compte, mais Better Auth expédie le
+   * message avant de faire cette vérification : sans ce filtre, on pourrait envoyer un
+   * e-mail au nom de la boutique à n'importe quelle adresse saisie — de quoi importuner
+   * quelqu'un et abîmer la réputation d'envoi du domaine.
+   *
+   * La réponse reste identique dans les deux cas : dire « adresse inconnue »
+   * permettrait de découvrir qui est client de la boutique.
+   */
+  app.post("/api/auth/sign-in/magic-link", async (c) => {
+    const corps = (await c.req.raw
+      .clone()
+      .json()
+      .catch(() => null)) as { email?: string } | null;
+    const email = corps?.email?.trim().toLowerCase();
+
+    if (email) {
+      const compte = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+      if (!compte) return c.json({ status: true });
+    }
+
+    return auth.handler(c.req.raw);
+  });
+
   app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
   // Session courante, telle que le front doit la voir : identité et rôle, rien de plus.
