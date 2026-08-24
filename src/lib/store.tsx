@@ -7,14 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  seedCategories,
-  seedContent,
-  seedOrders,
-  seedProducts,
-  seedPromos,
-  seedRegions,
-} from "@/data/seed";
+import { seedContent, seedOrders, seedPromos } from "@/data/seed";
+import { api } from "@/lib/api";
 import type {
   Category,
   DeliveryRegion,
@@ -39,21 +33,31 @@ type State = {
   user: SessionUser | null;
 };
 
+// Catalogue, catégories, zones et contenu viennent désormais de l'API. Commandes et
+// promotions restent sur les données de démonstration jusqu'aux lots 12 et 15.
 const initialState: State = {
-  products: seedProducts,
-  categories: seedCategories,
+  products: [],
+  categories: [],
   orders: seedOrders,
   promos: seedPromos,
-  regions: seedRegions,
+  regions: [],
   content: seedContent,
   cart: [],
   user: null,
 };
 
-const STORAGE_KEY = "decorek-store-v3";
+// Seuls le panier et la session sont persistés. Y garder le catalogue produirait
+// exactement le défaut rencontré avec les images : un navigateur servant indéfiniment
+// de vieilles données en ignorant la source.
+const STORAGE_KEY = "decorek-panier-v1";
+
+type EtatPersiste = Pick<State, "cart" | "user">;
 
 type StoreValue = State & {
   ready: boolean;
+  /** Message lisible si le chargement initial a échoué, `null` sinon. */
+  erreurChargement: string | null;
+  rafraichir: () => void;
   addToCart: (productId: string, quantity?: number) => void;
   setCartQuantity: (productId: string, quantity: number) => void;
   removeFromCart: (productId: string) => void;
@@ -85,25 +89,69 @@ const StoreContext = createContext<StoreValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initialState);
   const [ready, setReady] = useState(false);
+  const [erreurChargement, setErreurChargement] = useState<string | null>(null);
+  const [rechargement, setRechargement] = useState(0);
 
+  const rafraichir = useCallback(() => setRechargement((n) => n + 1), []);
+
+  // Panier et session : restaurés depuis le navigateur, avant tout appel réseau, pour
+  // qu'un panier reste visible même si l'API tarde.
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setState({ ...initialState, ...(JSON.parse(raw) as Partial<State>) });
+      const brut = window.localStorage.getItem(STORAGE_KEY);
+      if (brut) {
+        const persiste = JSON.parse(brut) as Partial<EtatPersiste>;
+        setState((s) => ({
+          ...s,
+          cart: persiste.cart ?? s.cart,
+          user: persiste.user ?? s.user,
+        }));
+      }
     } catch {
-      /* démo : on repart des données initiales */
+      /* panier illisible : on repart d'un panier vide plutôt que de bloquer le site */
     }
-    setReady(true);
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
+    const persiste: EtatPersiste = { cart: state.cart, user: state.user };
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persiste));
     } catch {
       /* quota indisponible */
     }
-  }, [state, ready]);
+  }, [state.cart, state.user]);
+
+  // Chargement du catalogue depuis l'API. Volontairement côté client : le rendu serveur
+  // n'a pas d'adresse d'API à interroger, et les données publiques n'ont pas besoin
+  // d'être dans le HTML initial à ce stade.
+  useEffect(() => {
+    const controleur = new AbortController();
+
+    void (async () => {
+      try {
+        const [catalogue, categories, content, regions] = await Promise.all([
+          // Le catalogue entier est chargé pour les écrans qui filtrent encore côté
+          // client (accueil, back-office). La boutique, elle, interroge l'API page par
+          // page. Au-delà de quelques dizaines de produits, ces écrans devront suivre.
+          api.produits({ parPage: 48 }, controleur.signal),
+          api.categories(controleur.signal),
+          api.contenu(controleur.signal),
+          api.livraison(controleur.signal),
+        ]);
+        setState((s) => ({ ...s, products: catalogue.items, categories, content, regions }));
+        setErreurChargement(null);
+      } catch (erreur) {
+        if (controleur.signal.aborted) return;
+        setErreurChargement(
+          erreur instanceof Error ? erreur.message : "La boutique est momentanément indisponible.",
+        );
+      } finally {
+        if (!controleur.signal.aborted) setReady(true);
+      }
+    })();
+
+    return () => controleur.abort();
+  }, [rechargement]);
 
   const patch = useCallback((fn: (s: State) => State) => setState((s) => fn(s)), []);
 
@@ -116,6 +164,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return {
       ...state,
       ready,
+      erreurChargement,
+      rafraichir,
       cartCount: state.cart.reduce((n, l) => n + l.quantity, 0),
       cartSubtotal,
       addToCart: (productId, quantity = 1) =>
@@ -224,9 +274,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deletePromo: (id) => patch((s) => ({ ...s, promos: s.promos.filter((p) => p.id !== id) })),
       setRegions: (regions) => patch((s) => ({ ...s, regions })),
       setContent: (content) => patch((s) => ({ ...s, content })),
-      resetDemo: () => setState({ ...initialState }),
+      resetDemo: () => {
+        setState((s) => ({ ...initialState, cart: s.cart, user: s.user }));
+        rafraichir();
+      },
     };
-  }, [state, ready, patch]);
+  }, [state, ready, erreurChargement, rafraichir, patch]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

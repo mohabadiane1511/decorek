@@ -6,10 +6,32 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+const PORT_API = process.env["API_PORT"] ?? "53000";
+const PORT_MEDIA = process.env["MINIO_PORT"] ?? "59000";
+const BUCKET = process.env["MINIO_BUCKET"] ?? "decorek-media";
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  vite: {
+    server: {
+      // Reproduit en développement ce que fera Caddy en production : un seul domaine,
+      // /api vers l'API et /media vers le stockage. Le front n'a donc jamais d'URL
+      // absolue à connaître, et il n'y a ni CORS ni cookies tiers à gérer.
+      proxy: {
+        "/api": {
+          target: `http://localhost:${PORT_API}`,
+          changeOrigin: true,
+        },
+        "/media": {
+          target: `http://localhost:${PORT_MEDIA}`,
+          changeOrigin: true,
+          rewrite: (chemin: string) => chemin.replace(/^\/media/, `/${BUCKET}`),
+        },
+      },
+    },
   },
 });

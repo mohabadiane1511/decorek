@@ -1,13 +1,53 @@
 import type { ReactNode } from "react";
+import { useStore } from "@/lib/store";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { WhatsAppButton } from "./WhatsAppButton";
 
+/**
+ * Attend que le catalogue soit chargé avant d'afficher la page.
+ *
+ * Sans cette attente, chaque écran afficherait brièvement une boutique vide — « 0 pièce »,
+ * des collections absentes — avant que les données n'arrivent, ce qui ressemble à une
+ * panne. En cas d'échec, on montre un message et un bouton pour réessayer, jamais une
+ * page blanche.
+ */
+function Chargement() {
+  return (
+    <div className="flex flex-1 items-center justify-center px-4 py-24">
+      <p className="label-mono text-muted-foreground">Chargement de la boutique…</p>
+    </div>
+  );
+}
+
+function Indisponible({ message, reessayer }: { message: string; reessayer: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">
+      <p className="section-index">Boutique indisponible</p>
+      <h1 className="title-lg mt-5 max-w-xl">{message}</h1>
+      <p className="mt-6 max-w-md text-muted-foreground">
+        Le service est momentanément injoignable. Vous pouvez réessayer dans un instant.
+      </p>
+      <button type="button" onClick={reessayer} className="btn-square btn-solid mt-8">
+        Réessayer
+      </button>
+    </div>
+  );
+}
+
 export function ShopLayout({ children }: { children: ReactNode }) {
+  const { ready, erreurChargement, rafraichir } = useStore();
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="flex-1">{children}</main>
+      {!ready ? (
+        <Chargement />
+      ) : erreurChargement ? (
+        <Indisponible message={erreurChargement} reessayer={rafraichir} />
+      ) : (
+        <main className="flex-1">{children}</main>
+      )}
       <Footer />
       <WhatsAppButton />
     </div>

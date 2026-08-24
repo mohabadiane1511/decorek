@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { ShopLayout } from "@/components/layout/ShopLayout";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { formatFcfa } from "@/lib/format";
+import { useQuery } from "@tanstack/react-query";
+import { api, ErreurApi as ErreurApiClient } from "@/lib/api";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/produit/$slug")({
@@ -40,8 +42,48 @@ function ProductPage() {
   const { products, categories, addToCart, content } = useStore();
   const [qty, setQty] = useState(1);
 
-  const product = products.find((p) => p.slug === slug);
-  if (!product) throw notFound();
+  // Interrogation directe par slug, plutôt qu'une recherche dans le catalogue chargé :
+  // celui-ci est plafonné, et un produit au-delà de cette limite passerait pour
+  // inexistant. C'est aussi ce qui évite de conclure à l'absence pendant le chargement.
+  const {
+    data: product,
+    isPending,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["produit", slug],
+    queryFn: ({ signal }) => api.produit(slug, signal),
+    retry: (tentatives, erreur) =>
+      // Inutile d'insister sur un produit qui n'existe pas.
+      !(erreur instanceof ErreurApiClient && erreur.statut === 404) && tentatives < 2,
+  });
+
+  if (isError && error instanceof ErreurApiClient && error.statut === 404) throw notFound();
+
+  if (isPending) {
+    return (
+      <ShopLayout>
+        <p className="label-mono py-24 text-center text-muted-foreground">
+          Chargement de l'article…
+        </p>
+      </ShopLayout>
+    );
+  }
+
+  if (isError || !product) {
+    return (
+      <ShopLayout>
+        <div className="py-24 text-center">
+          <p className="text-muted-foreground">
+            {error instanceof Error ? error.message : "Impossible de charger cet article."}
+          </p>
+          <Link to="/boutique" className="btn-square btn-outline mt-6">
+            Retour à la boutique
+          </Link>
+        </div>
+      </ShopLayout>
+    );
+  }
 
   const category = categories.find((c) => c.id === product.categoryId);
   const related = products

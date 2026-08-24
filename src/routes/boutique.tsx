@@ -1,11 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { api, type FiltresProduits } from "@/lib/api";
 import { formatFcfa } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useDebounce } from "@/lib/useDebounce";
 
 type Search = { categorie?: string | undefined; q?: string | undefined };
 
@@ -33,6 +36,7 @@ export const Route = createFileRoute("/boutique")({
 });
 
 const PAGE_SIZE = 8;
+type Tri = "recent" | "prix-asc" | "prix-desc";
 
 function Boutique() {
   const { products, categories } = useStore();
@@ -41,33 +45,48 @@ function Boutique() {
 
   const maxPrice = useMemo(() => Math.max(50000, ...products.map((p) => p.price)), [products]);
   const [priceMax, setPriceMax] = useState(maxPrice);
-  const [sort, setSort] = useState("recent");
+  const [sort, setSort] = useState<Tri>("recent");
   const [page, setPage] = useState(1);
 
+  // Le maximum n'est connu qu'une fois le catalogue chargé : on aligne le curseur
+  // dessus, sans quoi il resterait bloqué sur la valeur de repli.
+  useEffect(() => setPriceMax(maxPrice), [maxPrice]);
+
   const activeCategory = categories.find((c) => c.slug === search.categorie);
-  const query = (search.q ?? "").toLowerCase();
+  const qRetardee = useDebounce(search.q ?? "");
+  const prixRetarde = useDebounce(priceMax);
 
-  const filtered = useMemo(() => {
-    const list = products.filter(
-      (p) =>
-        (!activeCategory || p.categoryId === activeCategory.id) &&
-        p.price <= priceMax &&
-        (!query || p.name.toLowerCase().includes(query)),
-    );
-    if (sort === "prix-asc") list.sort((a, b) => a.price - b.price);
-    else if (sort === "prix-desc") list.sort((a, b) => b.price - a.price);
-    else list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    return list;
-  }, [products, activeCategory, priceMax, query, sort]);
+  const filtres: FiltresProduits = {
+    categorie: search.categorie,
+    q: qRetardee || undefined,
+    prixMax: prixRetarde < maxPrice ? prixRetarde : undefined,
+    tri: sort,
+    page,
+    parPage: PAGE_SIZE,
+  };
 
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const current = Math.min(page, pages);
-  const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  // Le filtrage, le tri et la pagination sont faits par l'API : le navigateur ne reçoit
+  // qu'une page à la fois, ce qui reste tenable quand le catalogue grandit.
+  const { data, isPending, isError, error, refetch, isFetching } = useQuery({
+    queryKey: ["produits", filtres],
+    queryFn: ({ signal }) => api.produits(filtres, signal),
+    // Garde la page précédente affichée pendant le chargement de la suivante, au lieu
+    // de vider la grille à chaque changement de filtre.
+    placeholderData: keepPreviousData,
+  });
+
+  // Un filtre plus restrictif peut rendre la page courante inexistante.
+  useEffect(() => {
+    if (data && page > data.pages) setPage(data.pages);
+  }, [data, page]);
 
   const setCategory = (slug?: string) => {
     setPage(1);
     void navigate({ search: (prev: Search) => ({ ...prev, categorie: slug }) });
   };
+
+  const total = data?.total ?? 0;
+  const pages = data?.pages ?? 1;
 
   return (
     <ShopLayout>
@@ -79,7 +98,7 @@ function Boutique() {
             ? activeCategory.description
             : "Toutes nos pièces, du dressage de table au mobilier de réception."
         }
-        aside={`${filtered.length} pièce${filtered.length > 1 ? "s" : ""}`}
+        aside={isPending ? "…" : `${total} pièce${total > 1 ? "s" : ""}`}
       />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -137,7 +156,10 @@ function Boutique() {
           </div>
           <select
             value={sort}
-            onChange={(e) => setSort(e.target.value)}
+            onChange={(e) => {
+              setPage(1);
+              setSort(e.target.value as Tri);
+            }}
             className="label-mono h-9 border border-input bg-background px-3"
             aria-label="Trier"
           >
@@ -147,13 +169,32 @@ function Boutique() {
           </select>
         </div>
 
-        {visible.length === 0 ? (
+        {isError ? (
+          <div className="py-20 text-center">
+            <p className="text-muted-foreground">
+              {error instanceof Error ? error.message : "Impossible de charger le catalogue."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="btn-square btn-outline mt-6"
+            >
+              Réessayer
+            </button>
+          </div>
+        ) : isPending ? (
+          <p className="label-mono py-20 text-center text-muted-foreground">Chargement…</p>
+        ) : data.items.length === 0 ? (
           <p className="py-20 text-center text-muted-foreground">
             Aucun article ne correspond à votre recherche.
           </p>
         ) : (
-          <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 xl:grid-cols-4">
-            {visible.map((p) => (
+          <div
+            className={`mt-12 grid grid-cols-2 gap-x-6 gap-y-14 transition-opacity md:grid-cols-3 xl:grid-cols-4 ${
+              isFetching ? "opacity-60" : ""
+            }`}
+          >
+            {data.items.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
           </div>
@@ -166,7 +207,7 @@ function Boutique() {
                 key={n}
                 onClick={() => setPage(n)}
                 className={`label-mono h-10 w-10 border transition-colors ${
-                  n === current
+                  n === page
                     ? "border-foreground bg-foreground text-background"
                     : "border-border hover:bg-muted"
                 }`}
