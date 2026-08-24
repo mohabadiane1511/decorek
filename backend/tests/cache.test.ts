@@ -113,6 +113,7 @@ describe("panne du cache", () => {
       cache: cacheMort,
       redis: redisMort,
       auth: contexte.auth,
+      courrier: contexte.courrier,
     });
 
     try {

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OrderTimeline } from "@/components/shop/OrderTimeline";
 import { formatDate, formatFcfa } from "@/lib/format";
+import { api } from "@/lib/api";
 import { statusLabels, useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/compte")({
@@ -28,6 +29,8 @@ function Compte() {
   const { user, signIn, inscrire, signOut, orders } = useStore();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [enCours, setEnCours] = useState(false);
+  const [aConfirmer, setAConfirmer] = useState<string | null>(null);
+  const [lienEnvoye, setLienEnvoye] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -57,7 +60,9 @@ function Compte() {
           toast.success("Bienvenue !");
         } else {
           await inscrire(name.trim() || adresse.split("@")[0]!, adresse, password);
-          toast.success("Compte créé");
+          // La session ne s'ouvre qu'une fois l'adresse confirmée : on l'annonce
+          // clairement, sinon le client croirait son inscription en échec.
+          setAConfirmer(adresse);
         }
         setPassword("");
         setConfirmation("");
@@ -67,6 +72,50 @@ function Compte() {
         setEnCours(false);
       }
     };
+
+    if (aConfirmer) {
+      return (
+        <ShopLayout>
+          <PageHeader
+            title="Confirmez votre adresse"
+            intro="Votre compte est créé. Il ne reste qu'à valider votre adresse e-mail."
+          />
+          <div className="mx-auto max-w-md px-4 pb-24">
+            <div className="border border-border p-6">
+              <p className="text-sm leading-relaxed">
+                Nous avons envoyé un lien à <span className="font-mono">{aConfirmer}</span>.
+                Ouvrez-le pour activer votre compte — il est valable 24 heures.
+              </p>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Pensez à regarder dans les indésirables si vous ne le voyez pas.
+              </p>
+              <button
+                type="button"
+                disabled={lienEnvoye}
+                onClick={() => {
+                  void api.renvoyerVerification(aConfirmer).catch(() => undefined);
+                  setLienEnvoye(true);
+                  toast.success("Lien renvoyé");
+                }}
+                className="btn-square btn-outline mt-6 w-full disabled:opacity-50"
+              >
+                {lienEnvoye ? "Lien renvoyé" : "Renvoyer le lien"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAConfirmer(null);
+                  setMode("login");
+                }}
+                className="mt-3 w-full text-center text-sm underline"
+              >
+                Retour à la connexion
+              </button>
+            </div>
+          </div>
+        </ShopLayout>
+      );
+    }
 
     return (
       <ShopLayout>
@@ -133,6 +182,25 @@ function Compte() {
             >
               {enCours ? "Un instant…" : mode === "login" ? "Se connecter" : "Créer mon compte"}
             </button>
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => {
+                  const adresse = email.trim().toLowerCase();
+                  if (!adresse) {
+                    toast.error("Indiquez d'abord votre adresse e-mail.");
+                    return;
+                  }
+                  // Réponse volontairement identique que le compte existe ou non :
+                  // dire « adresse inconnue » révélerait qui est client de la boutique.
+                  void api.demanderLienMagique(adresse).catch(() => undefined);
+                  toast.success("Si un compte existe, un lien vient d'être envoyé.");
+                }}
+                className="w-full border border-border px-6 py-3 text-sm transition-colors hover:bg-muted"
+              >
+                Recevoir un lien de connexion
+              </button>
+            )}
             {/* La connexion Google reviendra une fois les identifiants OAuth fournis.
                 Un bouton qui échoue au clic vaut moins qu'un bouton absent. */}
             <p className="pt-2 text-center text-sm text-muted-foreground">

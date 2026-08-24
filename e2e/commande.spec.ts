@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { confirmerAdresse } from "./mailpit.js";
 
 // Parcours d'achat complet, du catalogue à la confirmation, contre l'API réelle.
 
@@ -70,6 +71,7 @@ test("un code promo appliqué par un client connecté réduit le total", async (
   await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
   await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
   await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await confirmerAdresse(page, email);
   await expect(page.getByText("Bonjour, Awa Diop")).toBeVisible({ timeout: 15_000 });
 
   // 45 000 FCFA : au-dessus du minimum de 20 000 exigé par BIENVENUE10.
@@ -96,6 +98,7 @@ test("une remise sous le minimum requis est refusée avec son motif", async ({ p
   await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
   await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
   await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await confirmerAdresse(page, email);
   await expect(page.getByText("Bonjour, Awa Diop")).toBeVisible({ timeout: 15_000 });
 
   // 8 500 FCFA seulement : sous le minimum de 20 000.

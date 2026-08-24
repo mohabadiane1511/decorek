@@ -22,7 +22,7 @@ redis.on("error", () => {
 });
 const courrier = creerCourrier(config);
 const auth = creerAuth(prisma, redis, config, courrier);
-const app = creerApp({ config, prisma, cache, redis, auth });
+const app = creerApp({ config, prisma, cache, redis, auth, courrier });
 
 const serveur = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   console.log(`API Deco'Rek à l'écoute sur le port ${info.port} (${config.NODE_ENV})`);

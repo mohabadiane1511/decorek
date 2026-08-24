@@ -41,6 +41,7 @@ describe("contrôle de santé", () => {
       cache: contexte.cache,
       redis: contexte.redis,
       auth: contexte.auth,
+      courrier: contexte.courrier,
     });
 
     const reponse = await appCassee.request("/api/health");
@@ -107,6 +108,7 @@ describe("routes de diagnostic", () => {
       cache: contexte.cache,
       redis: contexte.redis,
       auth: contexte.auth,
+      courrier: contexte.courrier,
     });
 
     for (const route of [

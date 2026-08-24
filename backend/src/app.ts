@@ -7,6 +7,7 @@ import type { Redis } from "ioredis";
 import type { Auth } from "./auth.js";
 import { exigerAdmin, lireSession } from "./auth-middleware.js";
 import type { Cache } from "./cache.js";
+import type { Courrier } from "./mail.js";
 import type { Config } from "./config.js";
 import { limiter } from "./limite.js";
 import { ErreurApi, corpsErreur, gererErreur } from "./erreurs.js";
@@ -21,9 +22,10 @@ export type Dependances = {
   cache: Cache;
   redis: Redis;
   auth: Auth;
+  courrier: Courrier;
 };
 
-export function creerApp({ config, prisma, cache, redis, auth }: Dependances): Hono {
+export function creerApp({ config, prisma, cache, redis, auth, courrier }: Dependances): Hono {
   const app = new Hono();
 
   app.use("*", requestId());
@@ -86,7 +88,7 @@ export function creerApp({ config, prisma, cache, redis, auth }: Dependances): H
 
   app.route("/api", routesCatalogue(prisma, cache));
   app.route("/api", routesContenu(prisma, cache));
-  app.route("/api", routesCommandes(prisma, cache, auth));
+  app.route("/api", routesCommandes(prisma, cache, auth, courrier, config));
 
   // Routes de diagnostic : jamais montées en production. Elles servent aux tests du
   // contrat d'erreur, mais /api/boom offrirait sinon un moyen commode de polluer les

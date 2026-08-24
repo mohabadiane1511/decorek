@@ -7,6 +7,9 @@ import type { Cache } from "../cache.js";
 import { creerCommande, validerPromo } from "../commandes.js";
 import { corpsErreur } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import type { Config } from "../config.js";
+import type { Courrier } from "../mail.js";
+import { envoyerAlerteAdministration, envoyerConfirmationClient } from "../mail-commande.js";
 
 /**
  * Ce que le client a le droit d'envoyer : des identifiants et des quantités.
@@ -49,7 +52,13 @@ const schemaVerificationPromo = z.object({
     .max(50),
 });
 
-export function routesCommandes(prisma: PrismaClient, cache: Cache, auth: Auth): Hono {
+export function routesCommandes(
+  prisma: PrismaClient,
+  cache: Cache,
+  auth: Auth,
+  courrier: Courrier,
+  config: Config,
+): Hono {
   const routes = new Hono();
 
   // Prévisualise la remise pour l'afficher avant validation, sans consommer le code.
@@ -105,6 +114,19 @@ export function routesCommandes(prisma: PrismaClient, cache: Cache, auth: Auth):
 
       // Les stocks affichés ont changé : le catalogue en cache est périmé.
       await cache.invaliderCatalogue();
+
+      // Les e-mails partent après l'enregistrement, sans bloquer la réponse : une
+      // messagerie lente ne doit pas faire patienter le client devant son écran, ni
+      // faire échouer une commande déjà validée.
+      const contenu = await prisma.siteContent.findUnique({ where: { id: 1 } });
+      void Promise.all([
+        envoyerConfirmationClient(courrier, config, commande),
+        // L'adresse vient de la configuration du site, jamais de la requête : sinon
+        // n'importe qui se ferait adresser les coordonnées d'un acheteur.
+        contenu?.email
+          ? envoyerAlerteAdministration(courrier, config, commande, contenu.email)
+          : Promise.resolve(),
+      ]).catch((erreur) => console.error("Envoi des e-mails de commande impossible", erreur));
 
       return c.json(commande, 201);
     },

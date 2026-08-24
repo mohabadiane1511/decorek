@@ -17,6 +17,15 @@ async function inscrire(compte: typeof CLIENT): Promise<Response> {
   });
 }
 
+/**
+ * Marque l'adresse comme confirmée, sans passer par le lien reçu par e-mail.
+ * La connexion l'exige désormais ; suivre le lien dans chaque test n'apporterait rien
+ * de plus que ce que vérifie le test dédié.
+ */
+async function confirmerAdresse(email: string): Promise<void> {
+  await contexte.prisma.user.update({ where: { email }, data: { emailVerified: true } });
+}
+
 async function connecter(compte: { email: string; password: string }): Promise<Response> {
   return contexte.app.request("/api/auth/sign-in/email", {
     method: "POST",
@@ -51,6 +60,7 @@ beforeEach(async () => {
 describe("inscription et connexion", () => {
   it("crée un compte puis ouvre une session", async () => {
     expect((await inscrire(CLIENT)).status).toBe(200);
+    await confirmerAdresse(CLIENT.email);
 
     const reponse = await connecter(CLIENT);
     expect(reponse.status).toBe(200);
@@ -64,6 +74,18 @@ describe("inscription et connexion", () => {
     expect(compte?.password).not.toContain(CLIENT.password);
   });
 
+  it("refuse la connexion tant que l'adresse n'est pas confirmée", async () => {
+    expect((await inscrire(CLIENT)).status).toBe(200);
+
+    // Sans cette exigence, n'importe qui ouvrirait un compte au nom d'un tiers, et
+    // rien ne garantirait que la confirmation de commande arrive à destination.
+    const reponse = await connecter(CLIENT);
+    expect(reponse.status).toBeGreaterThanOrEqual(400);
+
+    await confirmerAdresse(CLIENT.email);
+    expect((await connecter(CLIENT)).status).toBe(200);
+  });
+
   it("refuse un mauvais mot de passe", async () => {
     await inscrire(CLIENT);
     const reponse = await connecter({ email: CLIENT.email, password: "mauvais-mot-de-passe" });
@@ -75,15 +97,22 @@ describe("inscription et connexion", () => {
     expect(reponse.status).toBeGreaterThanOrEqual(400);
   });
 
-  it("refuse deux comptes avec la même adresse", async () => {
+  it("ne crée jamais deux comptes pour la même adresse", async () => {
     expect((await inscrire(CLIENT)).status).toBe(200);
-    expect((await inscrire(CLIENT)).status).toBeGreaterThanOrEqual(400);
+    await inscrire(CLIENT);
+
+    // La seconde tentative peut répondre 200 sans rien créer : c'est délibéré côté
+    // Better Auth, et c'est souhaitable. Répondre « cette adresse existe déjà »
+    // permettrait à un inconnu de savoir qui est client de la boutique. Ce qui compte
+    // est donc l'état de la base, pas le code renvoyé.
+    expect(await contexte.prisma.user.count({ where: { email: CLIENT.email } })).toBe(1);
   });
 });
 
 describe("session", () => {
   it("expose l'utilisateur connecté", async () => {
     await inscrire(CLIENT);
+    await confirmerAdresse(CLIENT.email);
     const session = cookies(await connecter(CLIENT));
 
     const reponse = await contexte.app.request("/api/moi", { headers: { Cookie: session } });
@@ -101,6 +130,7 @@ describe("session", () => {
 
   it("invalide le cookie après déconnexion", async () => {
     await inscrire(CLIENT);
+    await confirmerAdresse(CLIENT.email);
     const session = cookies(await connecter(CLIENT));
 
     await contexte.app.request("/api/auth/sign-out", {
@@ -134,6 +164,7 @@ describe("contrôle d'accès à l'administration", () => {
 
   it("refuse un client connecté sans rôle", async () => {
     await inscrire(CLIENT);
+    await confirmerAdresse(CLIENT.email);
     const session = cookies(await connecter(CLIENT));
 
     const reponse = await contexte.app.request("/api/admin/verification", {
@@ -148,6 +179,7 @@ describe("contrôle d'accès à l'administration", () => {
     // La faille de la maquette : toute adresse commençant par « admin » ouvrait le
     // back-office. Ce test existe pour qu'elle ne puisse pas revenir.
     await inscrire(IMPOSTEUR);
+    await confirmerAdresse(IMPOSTEUR.email);
     const session = cookies(await connecter(IMPOSTEUR));
 
     const reponse = await contexte.app.request("/api/admin/verification", {
@@ -163,6 +195,7 @@ describe("contrôle d'accès à l'administration", () => {
     });
     await contexte.prisma.userRole.create({ data: { userId: utilisateur.id, role: "admin" } });
 
+    await confirmerAdresse(ADMIN.email);
     const session = cookies(await connecter(ADMIN));
     const reponse = await contexte.app.request("/api/admin/verification", {
       headers: { Cookie: session },
@@ -178,6 +211,7 @@ describe("contrôle d'accès à l'administration", () => {
     const role = await contexte.prisma.userRole.create({
       data: { userId: utilisateur.id, role: "admin" },
     });
+    await confirmerAdresse(ADMIN.email);
     const session = cookies(await connecter(ADMIN));
     expect(
       (await contexte.app.request("/api/admin/verification", { headers: { Cookie: session } }))

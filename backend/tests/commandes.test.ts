@@ -27,6 +27,12 @@ async function connecter(): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(CLIENT),
   });
+  // La connexion exige une adresse confirmée : on la valide directement, le parcours
+  // de confirmation étant couvert par les tests d'authentification.
+  await contexte.prisma.user.update({
+    where: { email: CLIENT.email },
+    data: { emailVerified: true },
+  });
   const reponse = await contexte.app.request("/api/auth/sign-in/email", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

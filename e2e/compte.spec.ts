@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { attendreMessage, confirmerAdresse, extraireLien } from "./mailpit.js";
 
 // Comptes distincts par exécution : les tests créent de vrais utilisateurs en base.
 const marque = Date.now();
@@ -14,6 +15,12 @@ async function creerCompte(page: Page, compte: { email: string; mdp: string; nom
   await page.getByLabel("Mot de passe", { exact: true }).fill(compte.mdp);
   await page.getByLabel("Confirmer le mot de passe").fill(compte.mdp);
   await page.getByRole("button", { name: "Créer mon compte" }).click();
+
+  // L'inscription n'ouvre pas de session : l'adresse doit d'abord être confirmée.
+  await expect(page.getByRole("heading", { name: "Confirmez votre adresse" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await confirmerAdresse(page, compte.email);
   await expect(page.getByText(`Bonjour, ${compte.nom}`)).toBeVisible({ timeout: 15_000 });
 }
 
@@ -82,4 +89,44 @@ test("deux mots de passe différents bloquent l'inscription", async ({ page }) =
   // Une faute de frappe ici enfermerait le client dehors : le compte ne doit pas
   // être créé, et on reste sur le formulaire.
   await expect(page.getByRole("heading", { name: "Créer un compte" })).toBeVisible();
+});
+
+test("l'inscription annonce la confirmation et n'ouvre pas de session", async ({ page }) => {
+  const adresse = `attente-${marque}@test.sn`;
+
+  await page.goto("/compte");
+  await page.getByRole("button", { name: "Créer un compte" }).click();
+  await page.getByLabel("Nom complet").fill("Awa Diop");
+  await page.getByLabel("Email").fill(adresse);
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+
+  await expect(page.getByRole("heading", { name: "Confirmez votre adresse" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText(adresse)).toBeVisible();
+
+  // Le compte existe mais reste inactif : se connecter doit être refusé, avec un
+  // motif compréhensible plutôt qu'un « identifiants incorrects » trompeur.
+  await page.goto("/compte");
+  await page.getByLabel("Email").fill(adresse);
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByRole("button", { name: "Se connecter" }).click();
+
+  await expect(page.getByText(/pas encore confirmée/i)).toBeVisible({ timeout: 15_000 });
+});
+
+test("le lien magique connecte sans mot de passe", async ({ page }) => {
+  const adresse = `magique-${marque}@test.sn`;
+  await creerCompte(page, { email: adresse, mdp: "motdepasse123", nom: "Awa Diop" });
+  await page.getByRole("button", { name: "Se déconnecter" }).click();
+
+  await page.getByLabel("Email").fill(adresse);
+  await page.getByRole("button", { name: "Recevoir un lien de connexion" }).click();
+
+  const texte = await attendreMessage(adresse, "lien de connexion");
+  await page.goto(extraireLien(texte));
+
+  await expect(page.getByText("Bonjour, Awa Diop")).toBeVisible({ timeout: 15_000 });
 });

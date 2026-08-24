@@ -43,15 +43,26 @@ async function envoyer<T>(chemin: string, corps: unknown): Promise<T> {
   }
 
   if (!reponse.ok) {
-    let details: { error?: { message?: string; code?: string }; message?: string } = {};
+    let details: { error?: { message?: string; code?: string }; message?: string; code?: string } =
+      {};
     try {
       details = (await reponse.json()) as typeof details;
     } catch {
       /* réponse non JSON */
     }
     // Better Auth répond avec { message }, notre API avec { error: { message } } :
-    // le front ne doit pas avoir à connaître cette différence.
+    // le front ne doit pas avoir à connaître cette différence. Ses messages sont en
+    // anglais : ceux qui arrivent sous les yeux d'un client sont traduits.
+    const traductions: Record<string, string> = {
+      EMAIL_NOT_VERIFIED:
+        "Votre adresse n'est pas encore confirmée. Ouvrez le lien reçu par e-mail, ou demandez-en un nouveau.",
+      INVALID_EMAIL_OR_PASSWORD: "Adresse e-mail ou mot de passe incorrect.",
+      USER_ALREADY_EXISTS: "Un compte existe déjà avec cette adresse.",
+      PASSWORD_TOO_SHORT: "Le mot de passe doit comporter au moins 8 caractères.",
+    };
+    const codeAuth = (details as { code?: string }).code;
     const message =
+      (codeAuth ? traductions[codeAuth] : undefined) ??
       details.error?.message ??
       details.message ??
       (reponse.status === 429
@@ -155,6 +166,17 @@ export const api = {
     envoyer<unknown>("/api/auth/sign-in/email", { email, password: motDePasse }),
 
   deconnecter: () => envoyer<unknown>("/api/auth/sign-out", {}),
+
+  /** Renvoie le lien de confirmation d'adresse. */
+  renvoyerVerification: (email: string) =>
+    envoyer<unknown>("/api/auth/send-verification-email", {
+      email,
+      callbackURL: "/compte",
+    }),
+
+  /** Demande un lien de connexion à usage unique. */
+  demanderLienMagique: (email: string) =>
+    envoyer<unknown>("/api/auth/sign-in/magic-link", { email, callbackURL: "/compte" }),
 
   /**
    * Envoie la commande. Le corps ne contient aucun montant : les prix, les frais et le
