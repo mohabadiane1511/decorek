@@ -1,0 +1,75 @@
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import type { Auth } from "../auth.js";
+import { lireSession } from "../auth-middleware.js";
+import type { Cache } from "../cache.js";
+import { creerCommande } from "../commandes.js";
+import { corpsErreur } from "../erreurs.js";
+import type { PrismaClient } from "../generated/prisma/client.js";
+
+/**
+ * Ce que le client a le droit d'envoyer : des identifiants et des quantités.
+ *
+ * Aucun montant n'y figure — ni prix, ni frais, ni total. Les accepter, même pour les
+ * « vérifier », ouvrirait la porte à une commande au prix choisi par l'acheteur.
+ */
+const schemaCommande = z.object({
+  customer: z.object({
+    name: z.string().trim().min(2, "Nom trop court").max(120),
+    phone: z.string().trim().min(6, "Téléphone invalide").max(30),
+    email: z.string().trim().email("Adresse e-mail invalide").optional(),
+  }),
+  delivery: z.object({
+    areaId: z.string().min(1, "Zone de livraison requise"),
+    address: z.string().trim().min(5, "Adresse trop courte").max(300),
+    note: z.string().trim().max(500).optional(),
+  }),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1),
+        // Plafond par ligne : au-delà, c'est une commande professionnelle qui mérite
+        // un échange de vive voix, pas un formulaire.
+        quantity: z.coerce.number().int().min(1).max(99),
+      }),
+    )
+    .min(1, "Votre panier est vide")
+    .max(50),
+  promoCode: z.string().trim().max(40).optional(),
+});
+
+export function routesCommandes(prisma: PrismaClient, cache: Cache, auth: Auth): Hono {
+  const routes = new Hono();
+
+  routes.post(
+    "/commandes",
+    zValidator("json", schemaCommande, (resultat, c) => {
+      if (!resultat.success) {
+        return c.json(corpsErreur("VALIDATION", "Commande invalide.", resultat.error.issues), 400);
+      }
+      return undefined;
+    }),
+    async (c) => {
+      const demande = c.req.valid("json");
+      // La commande en invité reste possible : c'est le compte qui est facultatif,
+      // pas la commande.
+      const session = await lireSession(auth, prisma, c);
+
+      const commande = await creerCommande(prisma, {
+        customer: demande.customer,
+        delivery: demande.delivery,
+        items: demande.items,
+        promoCode: demande.promoCode,
+        userId: session?.userId ?? null,
+      });
+
+      // Les stocks affichés ont changé : le catalogue en cache est périmé.
+      await cache.invaliderCatalogue();
+
+      return c.json(commande, 201);
+    },
+  );
+
+  return routes;
+}
