@@ -82,3 +82,75 @@ test("une recherche vide ne quitte pas la page", async ({ page }) => {
   // demandé : on reste où l'on est.
   await expect(page).toHaveURL(/\/contact/);
 });
+
+test("les articles paraissent à la frappe, avec photo et prix", async ({ page }) => {
+  await page.goto("/contact");
+  const champ = await ouvrirRecherche(page);
+
+  // Aucune validation : c'est tout l'objet de cette recherche.
+  await champ.fill("chaise");
+
+  const resultat = page.getByRole("option").filter({ hasText: "Chaise royale dorée" });
+  await expect(resultat).toBeVisible({ timeout: 20_000 });
+  // La photo et le prix sont là : on reconnaît l'article sans le lire en entier.
+  await expect(resultat.locator("img")).toBeVisible();
+  await expect(resultat).toContainText("FCFA");
+
+  // On est resté sur la page : rien n'a navigué.
+  await expect(page).toHaveURL(/\/contact/);
+});
+
+test("un résultat mène directement à sa fiche", async ({ page }) => {
+  await page.goto("/");
+  const champ = await ouvrirRecherche(page);
+  await champ.fill("chaise");
+
+  await page.getByRole("option").filter({ hasText: "Chaise royale dorée" }).click();
+  await expect(page).toHaveURL(/\/produit\/chaise-royale-doree/);
+  // Le panneau se referme derrière soi.
+  await expect(page.getByRole("option")).toHaveCount(0);
+});
+
+test("les flèches parcourent les résultats et Entrée ouvre le bon", async ({ page }) => {
+  await page.goto("/");
+  const champ = await ouvrirRecherche(page);
+  await champ.fill("chaise");
+  await expect(page.getByRole("option").first()).toBeVisible({ timeout: 20_000 });
+
+  await champ.press("ArrowDown");
+  await expect(page.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
+
+  await champ.press("Enter");
+  await expect(page).toHaveURL(/\/produit\//);
+});
+
+test("une recherche sans résultat le dit, sans page vide", async ({ page }) => {
+  await page.goto("/");
+  const champ = await ouvrirRecherche(page);
+  await champ.fill("zzzintrouvable");
+
+  // Le message visible porte le terme cherché ; son jumeau pour lecteurs d'écran, non.
+  await expect(page.getByText(/Aucun article ne correspond à/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("option")).toHaveCount(0);
+});
+
+test("une seule lettre ne déclenche pas de résultats", async ({ page }) => {
+  await page.goto("/");
+  const champ = await ouvrirRecherche(page);
+
+  // Presque tout le catalogue ressortirait : la liste n'apprendrait rien et la
+  // requête serait gaspillée sur une connexion mobile.
+  await champ.fill("c");
+  await page.waitForTimeout(1500);
+  await expect(page.getByRole("option")).toHaveCount(0);
+});
+
+test("un clic en dehors referme le panneau", async ({ page }) => {
+  await page.goto("/contact");
+  const champ = await ouvrirRecherche(page);
+  await champ.fill("chaise");
+  await expect(page.getByRole("option").first()).toBeVisible({ timeout: 20_000 });
+
+  await page.locator("footer").click({ position: { x: 5, y: 5 } });
+  await expect(page.getByLabel("Rechercher un article")).toHaveCount(0);
+});

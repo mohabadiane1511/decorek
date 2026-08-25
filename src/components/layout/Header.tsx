@@ -1,8 +1,9 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 const logo = "/images/logo-decorek.png";
 import { useStore } from "@/lib/store";
+import { RechercheRapide } from "./RechercheRapide";
 
 const links = [
   { to: "/boutique", label: "Boutique" },
@@ -13,23 +14,9 @@ const links = [
 
 export function Header() {
   const { cartCount, favoris } = useStore();
-  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [barVisible, setBarVisible] = useState(true);
   const [recherche, setRecherche] = useState(false);
-  const [terme, setTerme] = useState("");
-  const champ = useRef<HTMLInputElement>(null);
-
-  // La boutique sait déjà chercher : l'en-tête ne fait que l'y emmener avec le terme
-  // saisi, plutôt que d'ouvrir un second moteur à tenir en parallèle.
-  const lancer = (evenement: React.FormEvent): void => {
-    evenement.preventDefault();
-    const q = terme.trim();
-    if (!q) return;
-    setRecherche(false);
-    setOpen(false);
-    void navigate({ to: "/boutique", search: { q } });
-  };
 
   return (
     <header className="sticky top-0 z-40 bg-background">
@@ -91,9 +78,7 @@ export function Header() {
               type="button"
               onClick={() => {
                 setRecherche((v) => !v);
-                // Le champ prend le curseur à l'ouverture : sans cela, il faut viser
-                // une seconde fois, au doigt, sur un écran de téléphone.
-                setTimeout(() => champ.current?.focus(), 0);
+                setOpen(false);
               }}
               className="grid h-10 w-10 place-items-center transition-colors hover:bg-muted"
               // Distinct du bouton d'envoi, qui s'appelle « Rechercher » : deux
@@ -138,31 +123,7 @@ export function Header() {
         </div>
       </div>
 
-      {recherche && (
-        <form
-          onSubmit={lancer}
-          role="search"
-          className="border-b border-border bg-background px-4 py-3 sm:px-6"
-        >
-          <div className="mx-auto flex max-w-7xl items-center gap-2">
-            <input
-              ref={champ}
-              type="search"
-              value={terme}
-              onChange={(e) => setTerme(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setRecherche(false);
-              }}
-              placeholder="Rechercher un article…"
-              aria-label="Rechercher un article"
-              className="h-10 min-w-0 flex-1 border border-input bg-background px-3 text-sm"
-            />
-            <button type="submit" className="btn-square btn-solid h-10">
-              Rechercher
-            </button>
-          </div>
-        </form>
-      )}
+      {recherche && <RechercheRapide surFermeture={() => setRecherche(false)} />}
 
       {open && (
         <nav className="border-b border-border bg-background px-4 py-2 md:hidden">
