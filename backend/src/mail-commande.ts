@@ -3,7 +3,10 @@ import type { Config } from "./config.js";
 import { rendre, type Article, type Courrier, type Ligne } from "./mail.js";
 
 function fcfa(montant: number): string {
-  return `${montant.toLocaleString("fr-FR").replace(/ | /g, " ")} FCFA`;
+  // Le format français sépare les milliers par une espace insécable (U+00A0) ou fine
+  // insécable (U+202F) selon l'environnement. Plusieurs clients de messagerie les
+  // affichent en losange noir : on repasse à une espace ordinaire.
+  return `${montant.toLocaleString("fr-FR").replace(/[\u00A0\u202F]/g, " ")} FCFA`;
 }
 
 function articles(commande: Order): Article[] {

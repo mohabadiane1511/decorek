@@ -445,16 +445,18 @@ function Products() {
       {draft && (
         <div className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-2">
           <div>
-            <Label>Nom</Label>
+            <Label htmlFor="produit-nom">Nom</Label>
             <Input
+              id="produit-nom"
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               className="mt-1.5 rounded-none"
             />
           </div>
           <div>
-            <Label>Catégorie</Label>
+            <Label htmlFor="produit-categorie">Catégorie</Label>
             <select
+              id="produit-categorie"
               value={draft.categoryId}
               onChange={(e) => setDraft({ ...draft, categoryId: e.target.value })}
               className="mt-1.5 h-9 w-full border border-input bg-background px-3 text-sm"
@@ -506,8 +508,9 @@ function Products() {
             )}
           </div>
           <div>
-            <Label>Stock</Label>
+            <Label htmlFor="produit-stock">Stock</Label>
             <Input
+              id="produit-stock"
               type="number"
               value={draft.stock}
               onChange={(e) => setDraft({ ...draft, stock: Number(e.target.value) })}
@@ -515,8 +518,9 @@ function Products() {
             />
           </div>
           <div>
-            <Label>Seuil d'alerte stock</Label>
+            <Label htmlFor="produit-seuil">Seuil d'alerte stock</Label>
             <Input
+              id="produit-seuil"
               type="number"
               value={draft.lowStockThreshold}
               onChange={(e) => setDraft({ ...draft, lowStockThreshold: Number(e.target.value) })}
@@ -608,8 +612,9 @@ function Products() {
           </div>
 
           <div className="sm:col-span-2">
-            <Label>Description</Label>
+            <Label htmlFor="produit-description">Description</Label>
             <Textarea
+              id="produit-description"
               value={draft.description}
               onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               rows={3}
@@ -778,8 +783,9 @@ function Categories() {
           </div>
 
           <div className="sm:col-span-2">
-            <Label>Description</Label>
+            <Label htmlFor="categorie-description">Description</Label>
             <Textarea
+              id="categorie-description"
               value={draft.description}
               onChange={(e) => setDraft({ ...draft, description: e.target.value })}
               rows={2}

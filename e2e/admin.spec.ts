@@ -66,15 +66,22 @@ test("une modification de prix est enregistrée et visible en boutique", async (
   await ouvrirBackOffice(page, "prix");
   await page.getByRole("button", { name: "Produits" }).click();
 
-  await page.getByRole("button", { name: "Modifier" }).first().click();
+  // Un article nommé plutôt que « le premier de la liste », qui désignerait un produit
+  // différent selon ce qui tourne en parallèle. Ce miroir n'est lu par aucun autre
+  // test : la chaise et la sous-assiette servent aux montants attendus ailleurs.
+  await page
+    .locator("tr", { hasText: "Miroir goutte en bambou tressé" })
+    .first()
+    .getByRole("button", { name: "Modifier" })
+    .click();
   await page.getByLabel("Prix (FCFA)").fill("12345");
   await page.getByRole("button", { name: /Enregistrer/ }).click();
 
   await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
 
-  // La vraie preuve : le catalogue public reflète le changement, donc l'écriture a
-  // bien atteint la base et le cache a été invalidé.
-  await page.goto("/boutique");
+  // La vraie preuve : la vitrine reflète le changement, donc l'écriture a bien atteint
+  // la base et le cache a été invalidé. La fiche évite la pagination du catalogue.
+  await page.goto("/produit/miroir-goutte-bambou");
   await expect(page.getByText(/12 345 FCFA/).first()).toBeVisible({ timeout: 15_000 });
 });
 
@@ -120,17 +127,29 @@ test("l'onglet Commandes affiche une commande réelle", async ({ page }) => {
 test("un prix barré déclenche le badge Promo en boutique", async ({ page }) => {
   await ouvrirBackOffice(page, "promo");
   await page.getByRole("button", { name: "Produits" }).click();
-  await page.getByRole("button", { name: "Modifier" }).first().click();
+  // Un article réservé à ce test : modifier « le premier de la liste » toucherait
+  // un produit que d'autres tests lisent au même moment.
+  await page
+    .locator("tr", { hasText: "Housse de canapé matelassée" })
+    .first()
+    .getByRole("button", { name: "Modifier" })
+    .click();
 
   await page.getByLabel("Prix (FCFA)").fill("8000");
   await page.getByLabel("Prix barré (facultatif)").fill("12000");
   await page.getByRole("button", { name: /Enregistrer/ }).click();
   await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
 
-  await page.goto("/boutique");
-  // Le badge et l'ancien prix barré apparaissent ensemble.
-  await expect(page.getByText("Promo").first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/12 000 FCFA/).first()).toBeVisible();
+  // La fiche affiche l'ancien prix barré.
+  await page.goto("/produit/housse-canape-matelassee");
+  await expect(page.getByText(/12 000 FCFA/).first()).toBeVisible({ timeout: 15_000 });
+
+  // Le badge, lui, ne vit que sur les cartes du catalogue. On passe par la catégorie
+  // de l'article plutôt que par la boutique entière, dont la première page dépend des
+  // produits créés par les autres tests.
+  await page.goto("/boutique?categorie=textile-maison");
+  const carte = page.locator("article", { hasText: "Housse de canapé matelassée" }).first();
+  await expect(carte.getByText("Promo")).toBeVisible({ timeout: 15_000 });
 });
 
 test("un prix barré sous le prix de vente est refusé", async ({ page }) => {

@@ -127,3 +127,63 @@ test("Promotions : un code ajouté survit au rechargement", async ({ page }) => 
   await page.getByRole("button", { name: "Promotions" }).click();
   await expect(page.getByText(code.toUpperCase()).first()).toBeVisible({ timeout: 15_000 });
 });
+
+test("Produits : un article créé apparaît en boutique", async ({ page }) => {
+  const nom = `Photophore ambré ${marque}`;
+  await ouvrirBackOffice(page, "produits");
+  await page.getByRole("button", { name: "Produits" }).click();
+
+  await page.getByRole("button", { name: "Nouveau produit" }).click();
+  await page.getByLabel("Nom", { exact: true }).fill(nom);
+  await page.getByLabel("Prix (FCFA)").fill("14500");
+  await page.getByLabel("Stock", { exact: true }).fill("8");
+  await page.getByLabel("Description").fill("Verre soufflé teinté, hauteur 18 cm.");
+  await page
+    .getByRole("button", { name: /^Enregistrer$/ })
+    .first()
+    .click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  // La création passe par une route distincte de la mise à jour : la preuve se prend
+  // sur la vitrine, qui relit la base.
+  await page.goto("/boutique");
+  await expect(page.getByText(nom).first()).toBeVisible({ timeout: 20_000 });
+
+  // L'article est retiré une fois la preuve faite : laissé en place, il occuperait la
+  // première page du catalogue et ferait échouer des tests qui ne le connaissent pas.
+  await page.goto("/admin");
+  await page.getByRole("button", { name: "Produits" }).click();
+  const ligne = page.locator("tr", { hasText: nom }).first();
+  await ligne.getByRole("button", { name: /Supprimer/i }).click();
+  await expect(page.getByText(nom)).toHaveCount(0, { timeout: 15_000 });
+});
+
+test("Commandes : un changement de statut est enregistré", async ({ page }) => {
+  // Une commande réelle, passée depuis la boutique.
+  await page.goto("/produit/sous-assiette-solaire-doree");
+  await page.getByRole("button", { name: "Ajouter au panier" }).first().click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 10_000 });
+  await page.goto("/commande");
+  await page.getByLabel("Nom complet *").fill(`Cliente ${marque}`);
+  await page.getByLabel("Téléphone *").fill("+221 77 123 45 67");
+  await page.getByLabel("Adresse précise *").fill("Almadies, villa 4");
+  await page.getByRole("button", { name: /Valider ma commande/ }).click();
+  await expect(page).toHaveURL(/\/confirmation\//, { timeout: 20_000 });
+
+  await ouvrirBackOffice(page, "commandes");
+  await page.getByRole("button", { name: "Commandes" }).click();
+
+  // Les commandes sont des cartes, repérées par le nom de la cliente.
+  const carte = page.locator("article", { hasText: `Cliente ${marque}` }).first();
+  await carte.getByLabel("Statut").selectOption("confirmee");
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  await page.reload();
+  await page.getByRole("button", { name: "Commandes" }).click();
+  await expect(
+    page
+      .locator("article", { hasText: `Cliente ${marque}` })
+      .first()
+      .getByLabel("Statut"),
+  ).toHaveValue("confirmee", { timeout: 15_000 });
+});
