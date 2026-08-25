@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Order } from "../../src/data/types.js";
-import { slugifier } from "../src/routes/admin.js";
+import { lirePagination, slugifier } from "../src/routes/admin.js";
 import { retientLeStock } from "../src/stock.js";
 import { semer } from "../prisma/seed.js";
 import { creerContexte, type ContexteTest } from "./contexte.js";
@@ -520,5 +520,213 @@ describe("contenu et livraison", () => {
     };
     expect(items).toHaveLength(1);
     expect(items[0]!.areas[0]!.fee).toBe(1500);
+  });
+});
+
+describe("pagination et recherche du back-office", () => {
+  it("lit des paramètres aberrants sans échouer", () => {
+    // Un « page=0 » ou « parPage=abc » n'a rien à faire corriger par l'équipe : on
+    // retombe sur les valeurs par défaut plutôt que de renvoyer une erreur.
+    expect(lirePagination({ page: "0", parPage: "abc" })).toEqual({
+      q: undefined,
+      page: 1,
+      parPage: 20,
+    });
+    // Le plafond protège la base d'une demande démesurée.
+    expect(lirePagination({ parPage: "5000" }).parPage).toBe(100);
+    // Une recherche vide ne doit pas devenir un filtre sur la chaîne vide.
+    expect(lirePagination({ q: "   " }).q).toBeUndefined();
+    expect(lirePagination({ q: "  vase " }).q).toBe("vase");
+  });
+
+  it("découpe le catalogue en pages et annonce le total", async () => {
+    const premiere = await appeler("GET", "/api/admin/produits?parPage=3", cookieAdmin);
+    expect(premiere.status).toBe(200);
+    const page1 = (await premiere.json()) as { items: unknown[]; total: number; pages: number };
+    expect(page1.items).toHaveLength(3);
+    expect(page1.total).toBe(8);
+    expect(page1.pages).toBe(3);
+
+    const troisieme = await appeler("GET", "/api/admin/produits?parPage=3&page=3", cookieAdmin);
+    const page3 = (await troisieme.json()) as { items: { id: string }[] };
+    expect(page3.items).toHaveLength(2);
+
+    // Aucun article ne doit apparaître sur deux pages, ni manquer à l'appel.
+    const deuxieme = await appeler("GET", "/api/admin/produits?parPage=3&page=2", cookieAdmin);
+    const page2 = (await deuxieme.json()) as { items: { id: string }[] };
+    const ids = [...(page1.items as { id: string }[]), ...page2.items, ...page3.items].map(
+      (p) => p.id,
+    );
+    expect(new Set(ids).size).toBe(8);
+  });
+
+  it("montre les articles au-delà du 48e, que l'ancien écran perdait", async () => {
+    // Le back-office demandait 48 articles et l'API n'en servait pas davantage : au
+    // 49e produit, des articles existants devenaient impossibles à modifier.
+    const categorie = await contexte.prisma.category.findFirstOrThrow();
+    for (let i = 0; i < 45; i += 1) {
+      await contexte.prisma.product.create({
+        data: {
+          slug: `article-${i}`,
+          name: `Article ${i}`,
+          categoryId: categorie.id,
+          price: 1000,
+          stock: 1,
+          lowStockThreshold: 1,
+          description: "",
+        },
+      });
+    }
+
+    const reponse = await appeler("GET", "/api/admin/produits?parPage=100", cookieAdmin);
+    const { total, items } = (await reponse.json()) as { total: number; items: unknown[] };
+    expect(total).toBe(53);
+    expect(items).toHaveLength(53);
+  });
+
+  it("retrouve un article par son nom, sans souci de casse", async () => {
+    const reponse = await appeler("GET", "/api/admin/produits?q=CHAISE", cookieAdmin);
+    const { items } = (await reponse.json()) as { items: { name: string }[] };
+    expect(items).toHaveLength(1);
+    expect(items[0]!.name).toContain("Chaise");
+  });
+
+  it("refuse la liste des produits à qui n'est pas administrateur", async () => {
+    expect((await appeler("GET", "/api/admin/produits")).status).toBe(401);
+    expect((await appeler("GET", "/api/admin/produits", cookieClient)).status).toBe(403);
+  });
+
+  it("retrouve une commande par numéro, par nom et par téléphone", async () => {
+    const commande = await commander();
+
+    for (const terme of [commande.number, "Awa", "77 123"]) {
+      const reponse = await appeler(
+        "GET",
+        `/api/admin/commandes?q=${encodeURIComponent(terme)}`,
+        cookieAdmin,
+      );
+      const { items } = (await reponse.json()) as { items: { number: string }[] };
+      expect(
+        items.map((o) => o.number),
+        `recherche « ${terme} »`,
+      ).toContain(commande.number);
+    }
+  });
+
+  it("combine le filtre par statut et la recherche", async () => {
+    const commande = await commander();
+    await contexte.prisma.order.update({
+      where: { id: commande.id },
+      data: { status: "livree" },
+    });
+
+    const correspond = await appeler(
+      "GET",
+      `/api/admin/commandes?statut=livree&q=${encodeURIComponent(commande.number)}`,
+      cookieAdmin,
+    );
+    expect(((await correspond.json()) as { total: number }).total).toBe(1);
+
+    // Le même numéro, mais dans un autre statut : la commande ne doit pas ressortir.
+    const exclut = await appeler(
+      "GET",
+      `/api/admin/commandes?statut=annulee&q=${encodeURIComponent(commande.number)}`,
+      cookieAdmin,
+    );
+    expect(((await exclut.json()) as { total: number }).total).toBe(0);
+  });
+});
+
+describe("statistiques du tableau de bord", () => {
+  it("calcule sur toute la base, pas sur les commandes affichées", async () => {
+    // Le tableau de bord additionnait les commandes chargées par le navigateur, au
+    // plus 200 : au-delà, le chiffre d'affaires était silencieusement tronqué.
+    const commandes = [];
+    for (let i = 0; i < 5; i += 1) commandes.push(await commander(1));
+
+    const reponse = await appeler("GET", "/api/admin/statistiques", cookieAdmin);
+    expect(reponse.status).toBe(200);
+    const stats = (await reponse.json()) as {
+      chiffreAffaires: number;
+      encaisse: number;
+      commandes: number;
+      valides: number;
+      stockBas: number;
+      meilleurs: { name: string; quantite: number }[];
+      serie: { jour: string; total: number }[];
+    };
+
+    const attendu = commandes.reduce((s, o) => s + o.total, 0);
+    expect(stats.chiffreAffaires).toBe(attendu);
+    expect(stats.commandes).toBe(5);
+    expect(stats.valides).toBe(5);
+    // Rien n'est encaissé tant que la livraison n'a pas eu lieu.
+    expect(stats.encaisse).toBe(0);
+    expect(stats.serie.reduce((s, j) => s + j.total, 0)).toBe(attendu);
+    expect(stats.meilleurs[0]?.quantite).toBe(5);
+  });
+
+  it("exclut du chiffre d'affaires ce qui n'a rien rapporté", async () => {
+    const gardee = await commander(1);
+    const annulee = await commander(1);
+    await contexte.prisma.order.update({
+      where: { id: annulee.id },
+      data: { status: "annulee" },
+    });
+
+    const stats = (await (await appeler("GET", "/api/admin/statistiques", cookieAdmin)).json()) as {
+      chiffreAffaires: number;
+      commandes: number;
+      valides: number;
+    };
+
+    // La commande annulée reste comptée comme commande, jamais comme recette.
+    expect(stats.chiffreAffaires).toBe(gardee.total);
+    expect(stats.commandes).toBe(2);
+    expect(stats.valides).toBe(1);
+  });
+
+  it("compte le stock bas sur tout le catalogue", async () => {
+    const categorie = await contexte.prisma.category.findFirstOrThrow();
+    await contexte.prisma.product.create({
+      data: {
+        slug: "article-a-reassortir",
+        name: "Article à réassortir",
+        categoryId: categorie.id,
+        price: 1000,
+        stock: 1,
+        lowStockThreshold: 5,
+        description: "",
+      },
+    });
+
+    const stats = (await (await appeler("GET", "/api/admin/statistiques", cookieAdmin)).json()) as {
+      stockBas: number;
+    };
+    expect(stats.stockBas).toBeGreaterThanOrEqual(1);
+  });
+
+  it("ne retient que la période demandée", async () => {
+    const ancienne = await commander(1);
+    // Reculée de 60 jours : hors de la fenêtre de 30 jours par défaut.
+    await contexte.prisma.order.update({
+      where: { id: ancienne.id },
+      data: { createdAt: new Date(Date.now() - 60 * 86_400_000) },
+    });
+
+    const surTrenteJours = (await (
+      await appeler("GET", "/api/admin/statistiques?jours=30", cookieAdmin)
+    ).json()) as { commandes: number };
+    expect(surTrenteJours.commandes).toBe(0);
+
+    const surUnAn = (await (
+      await appeler("GET", "/api/admin/statistiques?jours=365", cookieAdmin)
+    ).json()) as { commandes: number };
+    expect(surUnAn.commandes).toBe(1);
+  });
+
+  it("refuse les statistiques à qui n'est pas administrateur", async () => {
+    expect((await appeler("GET", "/api/admin/statistiques")).status).toBe(401);
+    expect((await appeler("GET", "/api/admin/statistiques", cookieClient)).status).toBe(403);
   });
 });

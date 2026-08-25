@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -17,7 +18,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import { formatDate, formatFcfa } from "@/lib/format";
-import { api } from "@/lib/api";
+import { api, type FiltresAdmin, type PageAdmin } from "@/lib/api";
+import { useDebounce } from "@/lib/useDebounce";
 import { newId, statusLabels, useStore } from "@/lib/store";
 import type { Category, DeliveryRegion, OrderStatus, Product, PromoCode } from "@/data/types";
 
@@ -64,6 +66,133 @@ async function enregistrer(action: () => Promise<void>, succes: string): Promise
   } catch (erreur) {
     toast.error(erreur instanceof Error ? erreur.message : "Enregistrement impossible.");
   }
+}
+
+/** Nombre de lignes par page dans les écrans de gestion. */
+const PAR_PAGE = 20;
+
+/**
+ * Une liste du back-office : sa page courante, sa recherche, et de quoi la relire.
+ *
+ * La saisie est temporisée — chaque lettre déclencherait sinon une requête — et tout
+ * changement de recherche ramène en page 1, sans quoi une recherche à trois résultats
+ * consultée depuis la page 4 s'afficherait vide.
+ */
+function useListeAdmin<T>(
+  nom: string,
+  charger: (filtres: FiltresAdmin, signal?: AbortSignal) => Promise<PageAdmin<T>>,
+  filtresSupplementaires: FiltresAdmin = {},
+): {
+  page: number;
+  setPage: (page: number) => void;
+  recherche: string;
+  setRecherche: (valeur: string) => void;
+  liste: PageAdmin<T>;
+  chargement: boolean;
+  rafraichir: () => Promise<unknown>;
+} {
+  const client = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [recherche, setRecherche] = useState("");
+  const q = useDebounce(recherche);
+  const supplement = JSON.stringify(filtresSupplementaires);
+
+  const { data, isPending } = useQuery({
+    queryKey: [`admin-${nom}`, page, q, supplement],
+    queryFn: ({ signal }) =>
+      charger({ ...filtresSupplementaires, page, parPage: PAR_PAGE, q: q || undefined }, signal),
+    // L'ancienne page reste affichée pendant le chargement de la suivante : sans cela,
+    // le tableau disparaît à chaque frappe et l'écran sautille.
+    placeholderData: keepPreviousData,
+  });
+
+  const changerRecherche = (valeur: string): void => {
+    setRecherche(valeur);
+    setPage(1);
+  };
+
+  return {
+    page,
+    setPage,
+    recherche,
+    setRecherche: changerRecherche,
+    liste: data ?? { items: [], total: 0, page: 1, pages: 1 },
+    chargement: isPending,
+    rafraichir: () => client.invalidateQueries({ queryKey: [`admin-${nom}`] }),
+  };
+}
+
+/**
+ * Recherche et pagination des écrans qui listent beaucoup de lignes.
+ *
+ * Les listes du back-office chargeaient tout d'un bloc, dans la limite de ce que
+ * l'API acceptait de servir : au-delà, les lignes suivantes devenaient invisibles,
+ * donc impossibles à corriger. Elles se demandent maintenant page par page.
+ */
+function BarreListe({
+  recherche,
+  surRecherche,
+  page,
+  pages,
+  total,
+  surPage,
+  identifiant,
+  invite,
+  libelle,
+}: {
+  recherche: string;
+  surRecherche: (valeur: string) => void;
+  page: number;
+  pages: number;
+  total: number;
+  surPage: (page: number) => void;
+  identifiant: string;
+  invite: string;
+  libelle: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-[16rem] flex-1">
+        <Label htmlFor={identifiant}>Rechercher</Label>
+        <Input
+          id={identifiant}
+          value={recherche}
+          onChange={(e) => surRecherche(e.target.value)}
+          placeholder={invite}
+          className="mt-1.5 rounded-none"
+        />
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="label-mono text-muted-foreground">
+          {total} {libelle}
+          {total > 1 ? "s" : ""}
+        </span>
+        {pages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => surPage(page - 1)}
+              disabled={page <= 1}
+              className="btn-square btn-outline border-border disabled:opacity-40"
+            >
+              Précédent
+            </button>
+            <span className="label-mono">
+              {page} / {pages}
+            </span>
+            <button
+              type="button"
+              onClick={() => surPage(page + 1)}
+              disabled={page >= pages}
+              className="btn-square btn-outline border-border disabled:opacity-40"
+            >
+              Suivant
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function Admin() {
@@ -143,75 +272,90 @@ function Card({ title, value, hint }: { title: string; value: string; hint?: str
 }
 
 function Dashboard() {
-  const { orders, products } = useStore();
   const [days, setDays] = useState(30);
 
-  const since = Date.now() - days * 86400000;
-  const inRange = orders.filter((o) => new Date(o.createdAt).getTime() >= since);
-  const valid = inRange.filter((o) => o.status !== "annulee" && o.status !== "non_honoree");
-  const revenue = valid.reduce((s, o) => s + o.total, 0);
-  const cashed = inRange.filter((o) => o.paid).reduce((s, o) => s + o.total, 0);
-  const lowStock = products.filter((p) => p.stock <= p.lowStockThreshold);
+  // Les chiffres sont calculés en base. Ils étaient additionnés ici à partir des
+  // commandes que le navigateur avait chargées : passé ce plafond, le chiffre
+  // d'affaires devenait faux sans que rien ne l'indique.
+  const { data, isPending, isError, refetch } = useQuery({
+    queryKey: ["admin-statistiques", days],
+    queryFn: ({ signal }) => api.statistiques(days, signal),
+    placeholderData: keepPreviousData,
+  });
 
-  const best = useMemo(() => {
-    const map = new Map<string, { name: string; qty: number; total: number }>();
-    valid.forEach((o) =>
-      o.items.forEach((i) => {
-        const cur = map.get(i.productId) ?? { name: i.name, qty: 0, total: 0 };
-        cur.qty += i.quantity;
-        cur.total += i.price * i.quantity;
-        map.set(i.productId, cur);
-      }),
+  const periodes = (
+    <div className="flex gap-2">
+      {[7, 30, 90, 365].map((d) => (
+        <button
+          key={d}
+          onClick={() => setDays(d)}
+          className={`label-mono border px-3 py-2 ${days === d ? "border-foreground bg-foreground text-background" : "border-border bg-background hover:bg-muted"}`}
+        >
+          {d === 365 ? "1 an" : `${d} j`}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (isError) {
+    return (
+      <div className="space-y-8">
+        {periodes}
+        <div className="border border-border bg-background p-6 text-center">
+          <p className="text-muted-foreground">Impossible de charger les chiffres.</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="btn-square btn-outline mt-4 border-border"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
     );
-    return [...map.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
-  }, [valid]);
+  }
 
-  const series = useMemo(() => {
-    const buckets = new Map<string, number>();
-    valid.forEach((o) => {
-      const key = o.createdAt.slice(0, 10);
-      buckets.set(key, (buckets.get(key) ?? 0) + o.total);
-    });
-    return [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [valid]);
-  const max = Math.max(1, ...series.map((s) => s[1]));
+  if (isPending || !data) {
+    return (
+      <div className="space-y-8">
+        {periodes}
+        <p className="text-sm text-muted-foreground">Calcul en cours…</p>
+      </div>
+    );
+  }
+
+  const max = Math.max(1, ...data.serie.map((j) => j.total));
 
   return (
     <div className="space-y-8">
-      <div className="flex gap-2">
-        {[7, 30, 90, 365].map((d) => (
-          <button
-            key={d}
-            onClick={() => setDays(d)}
-            className={`label-mono border px-3 py-2 ${days === d ? "border-foreground bg-foreground text-background" : "border-border bg-background hover:bg-muted"}`}
-          >
-            {d === 365 ? "1 an" : `${d} j`}
-          </button>
-        ))}
-      </div>
+      {periodes}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card title="Chiffre d'affaires" value={formatFcfa(revenue)} hint="Commandes valides" />
-        <Card title="Encaissé" value={formatFcfa(cashed)} hint="Confirmé à la livraison" />
-        <Card title="Commandes" value={String(inRange.length)} hint={`${valid.length} valides`} />
-        <Card title="Stock bas" value={String(lowStock.length)} hint="Articles à réassortir" />
+        <Card
+          title="Chiffre d'affaires"
+          value={formatFcfa(data.chiffreAffaires)}
+          hint="Commandes valides"
+        />
+        <Card title="Encaissé" value={formatFcfa(data.encaisse)} hint="Confirmé à la livraison" />
+        <Card title="Commandes" value={String(data.commandes)} hint={`${data.valides} valides`} />
+        <Card title="Stock bas" value={String(data.stockBas)} hint="Articles à réassortir" />
       </div>
 
       <section className="border border-border bg-background p-6">
         <h2 className="font-display text-lg tracking-tight">Évolution du chiffre d'affaires</h2>
-        {series.length === 0 ? (
+        {data.serie.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">Aucune commande sur la période.</p>
         ) : (
-          <div className="mt-6 flex h-44 items-end gap-2">
-            {series.map(([date, value]) => (
-              <div key={date} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+          <div className="mt-6 flex items-end gap-1 overflow-x-auto">
+            {data.serie.map((j) => (
+              <div key={j.jour} className="flex min-w-0 flex-1 flex-col items-center gap-2">
                 <div
                   className="w-full bg-foreground"
-                  style={{ height: `${Math.max(4, (value / max) * 140)}px` }}
-                  title={`${date} — ${formatFcfa(value)}`}
+                  style={{ height: `${Math.max(4, (j.total / max) * 140)}px` }}
+                  title={`${j.jour} — ${formatFcfa(j.total)}`}
                 />
                 <span className="truncate text-[10px] text-muted-foreground">
-                  {date.slice(8)}/{date.slice(5, 7)}
+                  {j.jour.slice(8)}/{j.jour.slice(5, 7)}
                 </span>
               </div>
             ))}
@@ -223,12 +367,14 @@ function Dashboard() {
         <section className="border border-border bg-background p-6">
           <h2 className="font-display text-lg tracking-tight">Meilleures ventes</h2>
           <ul className="mt-4 divide-y divide-border">
-            {best.length === 0 && <li className="py-3 text-sm text-muted-foreground">—</li>}
-            {best.map((b) => (
+            {data.meilleurs.length === 0 && (
+              <li className="py-3 text-sm text-muted-foreground">—</li>
+            )}
+            {data.meilleurs.map((b) => (
               <li key={b.name} className="flex justify-between gap-3 py-3 text-sm">
                 <span className="min-w-0 truncate">{b.name}</span>
                 <span className="shrink-0 text-muted-foreground">
-                  {b.qty} vendus · {formatFcfa(b.total)}
+                  {b.quantite} vendus · {formatFcfa(b.total)}
                 </span>
               </li>
             ))}
@@ -240,10 +386,10 @@ function Dashboard() {
             <AlertTriangle className="h-4 w-4 text-orange-brand" strokeWidth={1.5} /> Alertes stock
           </h2>
           <ul className="mt-4 divide-y divide-border">
-            {lowStock.length === 0 && (
+            {data.alertes.length === 0 && (
               <li className="py-3 text-sm text-muted-foreground">Tous les stocks sont bons.</li>
             )}
-            {lowStock.map((p) => (
+            {data.alertes.map((p) => (
               <li key={p.id} className="flex justify-between gap-3 py-3 text-sm">
                 <span className="min-w-0 truncate">{p.name}</span>
                 <span className={p.stock === 0 ? "text-destructive" : "text-orange-brand"}>
@@ -252,6 +398,14 @@ function Dashboard() {
               </li>
             ))}
           </ul>
+          {data.stockBas > data.alertes.length && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              {data.stockBas - data.alertes.length} autre
+              {data.stockBas - data.alertes.length > 1 ? "s" : ""} article
+              {data.stockBas - data.alertes.length > 1 ? "s" : ""} à réassortir — voir l'onglet
+              Stocks.
+            </p>
+          )}
         </section>
       </div>
     </div>
@@ -269,15 +423,32 @@ const STATUSES: OrderStatus[] = [
 ];
 
 function Orders() {
-  const { orders, setOrderStatus, updateOrder } = useStore();
+  const { setOrderStatus, updateOrder } = useStore();
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
-  const list = orders.filter((o) => filter === "all" || o.status === filter);
+  // Le filtre part au serveur : appliqué ici, il ne trierait que la page affichée et
+  // masquerait les commandes du statut demandé restées sur les pages suivantes.
+  const { page, setPage, recherche, setRecherche, liste, rafraichir } = useListeAdmin(
+    "commandes",
+    (filtres, signal) => api.commandesAdmin(filtres, signal),
+    filter === "all" ? {} : { statut: filter },
+  );
+  const list = liste.items;
+
+  const changer = (action: () => Promise<void>, succes: string): void => {
+    void enregistrer(async () => {
+      await action();
+      await rafraichir();
+    }, succes);
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => setFilter("all")}
+          onClick={() => {
+            setFilter("all");
+            setPage(1);
+          }}
           className={`label-mono border px-3 py-2 ${filter === "all" ? "border-foreground bg-foreground text-background" : "border-border bg-background hover:bg-muted"}`}
         >
           Toutes
@@ -285,13 +456,30 @@ function Orders() {
         {STATUSES.map((s) => (
           <button
             key={s}
-            onClick={() => setFilter(s)}
+            onClick={() => {
+              setFilter(s);
+              // Un changement de filtre remet en première page : rester en page 3
+              // d'une liste qui n'en compte plus qu'une afficherait un écran vide.
+              setPage(1);
+            }}
             className={`label-mono border px-3 py-2 ${filter === s ? "border-foreground bg-foreground text-background" : "border-border bg-background hover:bg-muted"}`}
           >
             {statusLabels[s]}
           </button>
         ))}
       </div>
+
+      <BarreListe
+        identifiant="recherche-commandes"
+        invite="Numéro, nom ou téléphone…"
+        libelle="commande"
+        recherche={recherche}
+        surRecherche={setRecherche}
+        page={page}
+        pages={liste.pages}
+        total={liste.total}
+        surPage={setPage}
+      />
 
       <div className="space-y-4">
         {list.length === 0 && <p className="text-sm text-muted-foreground">Aucune commande.</p>}
@@ -337,7 +525,7 @@ function Orders() {
               <select
                 value={o.status}
                 onChange={(e) =>
-                  void enregistrer(
+                  changer(
                     () => setOrderStatus(o.id, e.target.value as OrderStatus),
                     "Statut mis à jour",
                   )
@@ -356,7 +544,7 @@ function Orders() {
                   type="checkbox"
                   checked={o.paid}
                   onChange={(e) =>
-                    void enregistrer(
+                    changer(
                       () => updateOrder(o.id, { paid: e.target.checked }),
                       "Encaissement enregistré",
                     )
@@ -368,7 +556,7 @@ function Orders() {
                 defaultValue={o.internalNote ?? ""}
                 placeholder="Note interne"
                 onBlur={(e) =>
-                  void enregistrer(
+                  changer(
                     () => updateOrder(o.id, { internalNote: e.target.value }),
                     "Note enregistrée",
                   )
@@ -407,11 +595,16 @@ const emptyProduct = (): Product => ({
 });
 
 function Products() {
-  const { products, categories, saveProduct, deleteProduct } = useStore();
+  const { categories, saveProduct, deleteProduct } = useStore();
   const [envoiImages, setEnvoiImages] = useState(false);
   const [enregistrement, setEnregistrement] = useState(false);
   const [draft, setDraft] = useState<Product | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const { page, setPage, recherche, setRecherche, liste, rafraichir } = useListeAdmin(
+    "produits",
+    (filtres, signal) => api.produitsAdmin(filtres, signal),
+  );
+  const products = liste.items;
 
   const save = () => {
     if (!draft) return;
@@ -425,10 +618,12 @@ function Products() {
       toast.error("Le prix barré doit être supérieur au prix de vente.");
       return;
     }
-    void enregistrer(
-      () => saveProduct({ ...draft, slug: slugify(draft.name) }),
-      "Produit enregistré",
-    );
+    void enregistrer(async () => {
+      await saveProduct({ ...draft, slug: slugify(draft.name) });
+      // La liste vient du serveur, page par page : sans cette relecture, l'écran
+      // garderait l'ancienne version jusqu'au prochain rechargement.
+      await rafraichir();
+    }, "Produit enregistré");
 
     setDraft(null);
   };
@@ -441,6 +636,18 @@ function Products() {
       >
         Nouveau produit
       </button>
+
+      <BarreListe
+        identifiant="recherche-produits"
+        invite="Nom de l'article…"
+        libelle="article"
+        recherche={recherche}
+        surRecherche={setRecherche}
+        page={page}
+        pages={liste.pages}
+        total={liste.total}
+        surPage={setPage}
+      />
 
       {draft && (
         <div className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-2">
@@ -673,7 +880,10 @@ function Products() {
                   </button>
                   <button
                     onClick={() => {
-                      void enregistrer(() => deleteProduct(p.id), "Produit supprimé");
+                      void enregistrer(async () => {
+                        await deleteProduct(p.id);
+                        await rafraichir();
+                      }, "Produit supprimé");
                     }}
                     className="text-destructive underline"
                   >
@@ -690,62 +900,90 @@ function Products() {
 }
 
 function Stock() {
-  const { products, saveProduct } = useStore();
-  const sorted = [...products].sort((a, b) => a.stock - b.stock);
+  const { saveProduct } = useStore();
+  // Tri confié au serveur : trier ici ne classerait que les lignes de la page
+  // affichée, et l'article le plus bas du catalogue pourrait rester invisible.
+  const { page, setPage, recherche, setRecherche, liste, rafraichir } = useListeAdmin(
+    "stocks",
+    (filtres, signal) => api.produitsAdmin({ ...filtres, tri: "stock" }, signal),
+  );
+  const sorted = liste.items;
+
+  const corriger = (action: () => Promise<void>, succes: string): void => {
+    void enregistrer(async () => {
+      await action();
+      await rafraichir();
+    }, succes);
+  };
+
   return (
-    <div className="overflow-x-auto border border-border bg-background">
-      <table className="w-full text-sm">
-        <thead className="border-b border-border label-mono text-left text-muted-foreground">
-          <tr>
-            <th className="px-4 py-3">Produit</th>
-            <th className="px-4 py-3">Stock</th>
-            <th className="px-4 py-3">Seuil</th>
-            <th className="px-4 py-3">État</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {sorted.map((p) => (
-            <tr key={p.id}>
-              <td className="px-4 py-3">{p.name}</td>
-              <td className="px-4 py-3">
-                <Input
-                  type="number"
-                  value={p.stock}
-                  onChange={(e) =>
-                    void enregistrer(
-                      () => saveProduct({ ...p, stock: Number(e.target.value) }),
-                      "Stock mis à jour",
-                    )
-                  }
-                  className="h-9 w-24 rounded-none"
-                />
-              </td>
-              <td className="px-4 py-3">
-                <Input
-                  type="number"
-                  value={p.lowStockThreshold}
-                  onChange={(e) =>
-                    void enregistrer(
-                      () => saveProduct({ ...p, lowStockThreshold: Number(e.target.value) }),
-                      "Seuil mis à jour",
-                    )
-                  }
-                  className="h-9 w-24 rounded-none"
-                />
-              </td>
-              <td className="px-4 py-3">
-                {p.stock === 0 ? (
-                  <span className="text-destructive">Épuisé</span>
-                ) : p.stock <= p.lowStockThreshold ? (
-                  <span className="text-orange-brand">Stock bas</span>
-                ) : (
-                  <span className="text-muted-foreground">OK</span>
-                )}
-              </td>
+    <div className="space-y-6">
+      <BarreListe
+        identifiant="recherche-stocks"
+        invite="Nom de l'article…"
+        libelle="article"
+        recherche={recherche}
+        surRecherche={setRecherche}
+        page={page}
+        pages={liste.pages}
+        total={liste.total}
+        surPage={setPage}
+      />
+
+      <div className="overflow-x-auto border border-border bg-background">
+        <table className="w-full text-sm">
+          <thead className="border-b border-border label-mono text-left text-muted-foreground">
+            <tr>
+              <th className="px-4 py-3">Produit</th>
+              <th className="px-4 py-3">Stock</th>
+              <th className="px-4 py-3">Seuil</th>
+              <th className="px-4 py-3">État</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {sorted.map((p) => (
+              <tr key={p.id}>
+                <td className="px-4 py-3">{p.name}</td>
+                <td className="px-4 py-3">
+                  <Input
+                    type="number"
+                    value={p.stock}
+                    onChange={(e) =>
+                      corriger(
+                        () => saveProduct({ ...p, stock: Number(e.target.value) }),
+                        "Stock mis à jour",
+                      )
+                    }
+                    className="h-9 w-24 rounded-none"
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <Input
+                    type="number"
+                    value={p.lowStockThreshold}
+                    onChange={(e) =>
+                      corriger(
+                        () => saveProduct({ ...p, lowStockThreshold: Number(e.target.value) }),
+                        "Seuil mis à jour",
+                      )
+                    }
+                    className="h-9 w-24 rounded-none"
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  {p.stock === 0 ? (
+                    <span className="text-destructive">Épuisé</span>
+                  ) : p.stock <= p.lowStockThreshold ? (
+                    <span className="text-orange-brand">Stock bas</span>
+                  ) : (
+                    <span className="text-muted-foreground">OK</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

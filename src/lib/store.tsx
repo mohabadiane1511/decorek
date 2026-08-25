@@ -172,10 +172,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // tout le monde exposerait des données de gestion à chaque visiteur.
         if (utilisateur?.isAdmin) {
           const [commandes, promos] = await Promise.all([
-            api.commandesAdmin(undefined, controleur.signal),
+            api.commandesAdmin({}, controleur.signal),
             api.promosAdmin(controleur.signal),
           ]);
-          setState((s) => ({ ...s, orders: commandes, promos }));
+          setState((s) => ({ ...s, orders: commandes.items, promos }));
         }
         setErreurChargement(null);
       } catch (erreur) {
@@ -310,7 +310,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           api.commandesAdmin(),
           api.produits({ parPage: 48 }),
         ]);
-        patch((s) => ({ ...s, orders: commandes, products: catalogue.items }));
+        patch((s) => ({ ...s, orders: commandes.items, products: catalogue.items }));
       },
 
       saveProduct: async (product) => {

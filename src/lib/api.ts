@@ -187,7 +187,38 @@ export type PageProduits = {
   pages: number;
 };
 
-export function construireRequete(filtres: FiltresProduits): string {
+/** Une page de résultats du back-office : même forme, quel que soit le contenu. */
+export type PageAdmin<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pages: number;
+};
+
+/** Chiffres du tableau de bord pour une période donnée. */
+export type Statistiques = {
+  jours: number;
+  chiffreAffaires: number;
+  encaisse: number;
+  commandes: number;
+  valides: number;
+  stockBas: number;
+  meilleurs: { productId: string | null; name: string; quantite: number; total: number }[];
+  alertes: { id: string; name: string; stock: number }[];
+  serie: { jour: string; total: number }[];
+};
+
+/** Ce qu'un écran d'administration demande : une page, éventuellement filtrée. */
+export type FiltresAdmin = {
+  q?: string | undefined;
+  page?: number | undefined;
+  parPage?: number | undefined;
+  statut?: string | undefined;
+  /** « stock » remonte les articles à réassortir ; par défaut, les plus récents. */
+  tri?: "stock" | undefined;
+};
+
+export function construireRequete(filtres: FiltresProduits | FiltresAdmin): string {
   const params = new URLSearchParams();
   for (const [cle, valeur] of Object.entries(filtres)) {
     if (valeur !== undefined && valeur !== "") params.set(cle, String(valeur));
@@ -232,12 +263,28 @@ export const api = {
 
   // ---------------------------------------------------------- Administration
 
-  /** Commandes du back-office, filtrables par statut. */
-  commandesAdmin: (statut?: string, signal?: AbortSignal) =>
-    appeler<{ items: Order[] }>(
-      `/api/admin/commandes${statut ? `?statut=${encodeURIComponent(statut)}` : ""}`,
-      signal,
-    ).then((r) => r.items),
+  /**
+   * Chiffres du tableau de bord, calculés en base.
+   *
+   * Ils étaient additionnés dans le navigateur à partir des commandes chargées : au
+   * delà de ce que l'API acceptait de servir, le chiffre d'affaires était tronqué
+   * sans que rien ne le signale.
+   */
+  statistiques: (jours: number, signal?: AbortSignal) =>
+    appeler<Statistiques>(`/api/admin/statistiques?jours=${jours}`, signal),
+
+  /**
+   * Catalogue vu par le back-office : paginé et non mis en cache.
+   *
+   * Distinct de `produits` : la route publique plafonne à 48 articles par page, ce qui
+   * rendait les suivants impossibles à modifier une fois le catalogue étoffé.
+   */
+  produitsAdmin: (filtres: FiltresAdmin = {}, signal?: AbortSignal) =>
+    appeler<PageAdmin<Product>>(`/api/admin/produits${construireRequete(filtres)}`, signal),
+
+  /** Commandes du back-office, filtrables par statut et par recherche libre. */
+  commandesAdmin: (filtres: FiltresAdmin = {}, signal?: AbortSignal) =>
+    appeler<PageAdmin<Order>>(`/api/admin/commandes${construireRequete(filtres)}`, signal),
 
   majCommande: (
     id: string,

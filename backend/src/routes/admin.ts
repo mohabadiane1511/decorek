@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { OrderStatus } from "../../../src/data/types.js";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { Auth } from "../auth.js";
@@ -27,6 +28,32 @@ export function slugifier(nom: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+}
+
+/**
+ * Lit les paramètres de pagination et de recherche communs aux écrans du back-office.
+ *
+ * Le plafond par page protège la base : sans lui, l'équipe — ou un onglet resté
+ * ouvert — pourrait réclamer des milliers de lignes d'un coup. Une saisie aberrante
+ * (page zéro, texte à la place d'un nombre) retombe sur la valeur par défaut plutôt
+ * que de faire échouer la requête, car il n'y a rien à corriger côté utilisateur.
+ */
+export function lirePagination(query: Record<string, string | undefined>): {
+  q: string | undefined;
+  page: number;
+  parPage: number;
+} {
+  const nombre = (valeur: string | undefined, defaut: number, max: number): number => {
+    const lu = Number(valeur);
+    if (!Number.isInteger(lu) || lu < 1) return defaut;
+    return Math.min(lu, max);
+  };
+  const recherche = (query["q"] ?? "").trim();
+  return {
+    q: recherche.length > 0 ? recherche : undefined,
+    page: nombre(query["page"], 1, 10_000),
+    parPage: nombre(query["parPage"], 20, 100),
+  };
 }
 
 const STATUTS = [
@@ -166,7 +193,123 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
     return c.json(prepare);
   });
 
+  // ----------------------------------------------------------- Tableau de bord
+
+  routes.get("/admin/statistiques", async (c) => {
+    // Bornes larges : « 0 jour » n'a pas de sens et dix ans suffisent à tout historique.
+    const lu = Number(c.req.query("jours"));
+    const jours = Number.isInteger(lu) && lu >= 1 ? Math.min(lu, 3650) : 30;
+    const depuis = new Date(Date.now() - jours * 86_400_000);
+
+    const periode = { createdAt: { gte: depuis } };
+    // Une commande annulée ou non honorée n'a rien rapporté : elle compte dans le
+    // nombre de commandes, jamais dans le chiffre d'affaires.
+    const valides = { ...periode, status: { notIn: ["annulee", "non_honoree"] as OrderStatus[] } };
+
+    const [chiffre, encaisse, commandes, nombreValides, meilleurs] = await Promise.all([
+      prisma.order.aggregate({ where: valides, _sum: { total: true } }),
+      prisma.order.aggregate({ where: { ...periode, paid: true }, _sum: { total: true } }),
+      prisma.order.count({ where: periode }),
+      prisma.order.count({ where: valides }),
+      prisma.orderItem.groupBy({
+        by: ["productId", "name"],
+        where: { order: valides },
+        _sum: { quantity: true },
+        orderBy: { _sum: { quantity: "desc" } },
+        take: 5,
+      }),
+    ]);
+
+    // Le chiffre d'affaires par article ne peut pas être agrégé en une passe : il vaut
+    // prix × quantité, un produit de deux colonnes que le groupBy ne calcule pas.
+    const recettes = await prisma.$queryRaw<{ name: string; total: bigint }[]>`
+      SELECT i.name, SUM(i.price * i.quantity)::bigint AS total
+        FROM order_items i
+        JOIN orders o ON o.id = i.order_id
+       WHERE o.created_at >= ${depuis}
+         AND o.status NOT IN ('annulee', 'non_honoree')
+       GROUP BY i.name`;
+    const recetteParNom = new Map(recettes.map((l) => [l.name, Number(l.total)]));
+
+    // Deux colonnes comparées entre elles : Prisma ne l'exprime pas, d'où le SQL.
+    // La liste est bornée — l'écran n'en montre qu'un aperçu, l'onglet Stocks sert au
+    // détail — mais le compte, lui, porte sur tout le catalogue.
+    const [{ bas }] = await prisma.$queryRaw<[{ bas: bigint }]>`
+      SELECT COUNT(*)::bigint AS bas FROM products WHERE stock <= low_stock_threshold`;
+    const alertes = await prisma.$queryRaw<{ id: string; name: string; stock: number }[]>`
+      SELECT id, name, stock FROM products
+       WHERE stock <= low_stock_threshold
+       ORDER BY stock ASC
+       LIMIT 20`;
+
+    // Le regroupement par jour se fait en base : ramener chaque commande pour les
+    // compter ici reviendrait à charger tout l'historique dans le navigateur.
+    const serie = await prisma.$queryRaw<{ jour: Date; total: bigint }[]>`
+      SELECT date_trunc('day', created_at) AS jour, SUM(total)::bigint AS total
+        FROM orders
+       WHERE created_at >= ${depuis}
+         AND status NOT IN ('annulee', 'non_honoree')
+       GROUP BY jour
+       ORDER BY jour`;
+
+    return c.json({
+      jours,
+      chiffreAffaires: chiffre._sum?.total ?? 0,
+      encaisse: encaisse._sum?.total ?? 0,
+      commandes,
+      valides: nombreValides,
+      stockBas: Number(bas),
+      meilleurs: meilleurs.map((l) => ({
+        productId: l.productId,
+        name: l.name,
+        quantite: l._sum?.quantity ?? 0,
+        total: recetteParNom.get(l.name) ?? 0,
+      })),
+      alertes,
+      serie: serie.map((l) => ({
+        jour: l.jour.toISOString().slice(0, 10),
+        total: Number(l.total),
+      })),
+    });
+  });
+
   // ---------------------------------------------------------------- Produits
+
+  routes.get("/admin/produits", async (c) => {
+    const { q, page, parPage } = lirePagination(c.req.query());
+
+    // Jamais mis en cache, contrairement au catalogue public : l'équipe doit voir
+    // l'effet de sa modification immédiatement, pas au bout de cinq minutes.
+    const where = q
+      ? { name: { contains: q, mode: "insensitive" as const } }
+      : ({} as Record<string, never>);
+
+    // L'écran des stocks met les articles à réassortir en tête. Le tri doit se faire
+    // en base : trier les vingt lignes de la page en cours ne remonterait que le plus
+    // bas de cette page, pas celui du catalogue.
+    const orderBy =
+      c.req.query("tri") === "stock"
+        ? ({ stock: "asc" } as const)
+        : ({ createdAt: "desc" } as const);
+
+    const [total, produits] = await prisma.$transaction([
+      prisma.product.count({ where }),
+      prisma.product.findMany({
+        where,
+        orderBy,
+        include: { images: { orderBy: { position: "asc" } } },
+        skip: (page - 1) * parPage,
+        take: parPage,
+      }),
+    ]);
+
+    return c.json({
+      items: produits.map(versProduit),
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / parPage)),
+    });
+  });
 
   routes.post("/admin/produits", validation(schemaProduit), async (c) => {
     const donnees = c.req.valid("json");
@@ -302,17 +445,43 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
 
   routes.get("/admin/commandes", async (c) => {
     const statut = c.req.query("statut");
-    const commandes = await prisma.order.findMany({
-      where:
-        statut && STATUTS.includes(statut as (typeof STATUTS)[number])
-          ? { status: statut as (typeof STATUTS)[number] }
-          : {},
-      orderBy: { createdAt: "desc" },
-      include: { items: true },
-      take: 200,
-    });
+    const { q, page, parPage } = lirePagination(c.req.query());
+
+    const where = {
+      ...(statut && STATUTS.includes(statut as (typeof STATUTS)[number])
+        ? { status: statut as (typeof STATUTS)[number] }
+        : {}),
+      // Trois façons de retrouver une commande, selon ce que la cliente a sous la main
+      // au téléphone : son numéro, son nom, ou le numéro qu'elle appelle.
+      ...(q
+        ? {
+            OR: [
+              { number: { contains: q, mode: "insensitive" as const } },
+              { customerName: { contains: q, mode: "insensitive" as const } },
+              { customerPhone: { contains: q } },
+            ],
+          }
+        : {}),
+    };
+
+    const [total, commandes] = await prisma.$transaction([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { items: true },
+        skip: (page - 1) * parPage,
+        take: parPage,
+      }),
+    ]);
+
     // Le back-office voit la note interne, contrairement au suivi client.
-    return c.json({ items: commandes.map((o) => versCommande(o, { avecNoteInterne: true })) });
+    return c.json({
+      items: commandes.map((o) => versCommande(o, { avecNoteInterne: true })),
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / parPage)),
+    });
   });
 
   routes.patch("/admin/commandes/:id", validation(schemaCommande), async (c) => {
