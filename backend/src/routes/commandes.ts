@@ -3,9 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { Auth } from "../auth.js";
 import { lireSession } from "../auth-middleware.js";
+import { versCommande } from "../conversions.js";
 import type { Cache } from "../cache.js";
 import { creerCommande, validerPromo } from "../commandes.js";
-import { corpsErreur } from "../erreurs.js";
+import { corpsErreur, ErreurApi } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
 import type { Config } from "../config.js";
 import type { Courrier } from "../mail.js";
@@ -131,6 +132,40 @@ export function routesCommandes(
       return c.json(commande, 201);
     },
   );
+
+  /**
+   * Historique de la cliente connectée.
+   *
+   * Deux rattachements, parce qu'une commande peut précéder le compte : celles passées
+   * en étant connectée portent son identifiant, celles passées en invité ne portent
+   * que l'adresse e-mail saisie. Cette seconde voie n'est ouverte que sur l'adresse de
+   * la session, confirmée à l'inscription — personne ne consulte l'historique d'un
+   * tiers en déclarant son adresse.
+   *
+   * La note interne de l'équipe n'est jamais jointe : c'est `versCommande` sans option
+   * qui l'écarte, comme pour le suivi public.
+   */
+  routes.get("/mes-commandes", async (c) => {
+    const session = await lireSession(auth, prisma, c);
+    if (!session) throw new ErreurApi("NON_AUTHENTIFIE", "Connexion requise.");
+
+    const commandes = await prisma.order.findMany({
+      where: {
+        OR: [{ userId: session.userId }, { customerEmail: session.email }],
+      },
+      orderBy: { createdAt: "desc" },
+      include: { items: true },
+      // Une cliente fidèle finirait par en accumuler beaucoup ; l'écran n'en montre
+      // de toute façon qu'un historique récent.
+      take: 50,
+    });
+
+    return c.json({ items: commandes.map((o) => versCommande(o)) }, 200, {
+      // L'état d'une commande change : une réponse gardée en cache afficherait
+      // « en préparation » à une cliente dont le colis est parti.
+      "Cache-Control": "no-store",
+    });
+  });
 
   return routes;
 }

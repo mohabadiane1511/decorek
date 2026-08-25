@@ -350,3 +350,84 @@ describe("validation de la demande", () => {
     expect(reponse.status).toBe(400);
   });
 });
+
+describe("historique de la cliente", () => {
+  async function mesCommandes(cookie?: string): Promise<Response> {
+    const entetes: Record<string, string> = {};
+    if (cookie) entetes["Cookie"] = cookie;
+    return contexte.app.request("/api/mes-commandes", { headers: entetes });
+  }
+
+  it("rend les commandes passées en étant connectée", async () => {
+    const cookie = await connecter();
+    const passee = (await (await commander(await demande(), cookie)).json()) as Order;
+
+    const reponse = await mesCommandes(cookie);
+    expect(reponse.status).toBe(200);
+    const { items } = (await reponse.json()) as { items: Order[] };
+    expect(items.map((o) => o.number)).toContain(passee.number);
+  });
+
+  it("rattache aussi celles passées en invitée avec la même adresse", async () => {
+    // Le cas courant : on commande d'abord, on crée son compte ensuite.
+    const avant = (await (
+      await commander(
+        await demande({
+          customer: { name: "Awa Diop", phone: "+221 77 123 45 67", email: CLIENT.email },
+        }),
+      )
+    ).json()) as Order;
+
+    const cookie = await connecter();
+    const { items } = (await (await mesCommandes(cookie)).json()) as { items: Order[] };
+    expect(items.map((o) => o.number)).toContain(avant.number);
+  });
+
+  it("ne montre jamais la commande d'une autre personne", async () => {
+    const autre = (await (
+      await commander(
+        await demande({
+          customer: { name: "Fatou Sow", phone: "+221 78 000 00 00", email: "fatou@test.sn" },
+        }),
+      )
+    ).json()) as Order;
+
+    const cookie = await connecter();
+    const { items } = (await (await mesCommandes(cookie)).json()) as { items: Order[] };
+    expect(items.map((o) => o.number)).not.toContain(autre.number);
+  });
+
+  it("n'expose pas la note interne de l'équipe", async () => {
+    const cookie = await connecter();
+    const commande = (await (await commander(await demande(), cookie)).json()) as Order;
+    await contexte.prisma.order.update({
+      where: { id: commande.id },
+      data: { internalNote: "Cliente difficile, exiger un acompte" },
+    });
+
+    const brut = await (await mesCommandes(cookie)).text();
+    expect(brut).not.toContain("acompte");
+    expect(brut).not.toContain("internalNote");
+  });
+
+  it("refuse l'accès à qui n'est pas connecté", async () => {
+    expect((await mesCommandes()).status).toBe(401);
+  });
+
+  it("interdit la mise en cache de la réponse", async () => {
+    // Un état gardé en cache annoncerait « en préparation » à une cliente dont le
+    // colis est déjà parti.
+    const cookie = await connecter();
+    expect((await mesCommandes(cookie)).headers.get("cache-control")).toContain("no-store");
+  });
+
+  it("rend les commandes de la plus récente à la plus ancienne", async () => {
+    const cookie = await connecter();
+    await commander(await demande(), cookie);
+    await commander(await demande(), cookie);
+
+    const { items } = (await (await mesCommandes(cookie)).json()) as { items: Order[] };
+    const dates = items.map((o) => new Date(o.createdAt).getTime());
+    expect(dates).toEqual([...dates].sort((a, b) => b - a));
+  });
+});

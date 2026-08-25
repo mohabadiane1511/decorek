@@ -263,6 +263,16 @@ export const api = {
       callbackURL: "/compte",
     }),
 
+  /**
+   * Historique de la cliente connectée.
+   *
+   * Distinct des commandes du back-office : l'écran du compte lisait jusqu'ici la même
+   * liste, qui n'est chargée que pour les administratrices — une cliente n'y voyait
+   * donc que les commandes passées pendant sa visite en cours.
+   */
+  mesCommandes: (signal?: AbortSignal) =>
+    appeler<{ items: Order[] }>("/api/mes-commandes", signal).then((r) => r.items),
+
   // ---------------------------------------------------------- Administration
 
   /**

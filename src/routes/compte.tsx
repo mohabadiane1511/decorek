@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { Input } from "@/components/ui/input";
@@ -108,7 +109,7 @@ function EcranAttente({ attente, retour }: { attente: NonNullable<Attente>; reto
 }
 
 function Compte() {
-  const { user, signIn, inscrire, signOut, orders } = useStore();
+  const { user, signIn, inscrire, signOut } = useStore();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [methode, setMethode] = useState<Methode>("motdepasse");
   const [enCours, setEnCours] = useState(false);
@@ -319,58 +320,162 @@ function Compte() {
     );
   }
 
-  const myOrders = orders.filter(
-    (o) => o.userEmail === user.email || o.customer.email === user.email,
+  return (
+    <EspaceClient
+      onDeconnexion={() => {
+        // Revenir au formulaire de connexion : quelqu'un qui vient de se déconnecter
+        // veut se reconnecter, pas créer un second compte.
+        setMode("login");
+        setMethode("motdepasse");
+        void signOut();
+      }}
+    />
+  );
+}
+
+/**
+ * Ce que voit une cliente connectée.
+ *
+ * L'historique vient d'une route dédiée. Il était auparavant tiré de la liste du
+ * back-office, qui n'est chargée que pour les administratrices : une cliente n'y
+ * retrouvait que les commandes passées pendant sa visite en cours, et repartait en
+ * croyant les précédentes perdues.
+ */
+function EspaceClient({ onDeconnexion }: { onDeconnexion: () => void }) {
+  const { user, favoris } = useStore();
+
+  const { data, isPending, isError, refetch } = useQuery({
+    queryKey: ["mes-commandes"],
+    queryFn: ({ signal }) => api.mesCommandes(signal),
+  });
+
+  const commandes = data ?? [];
+  const enCours = commandes.filter(
+    (o) => o.status !== "livree" && o.status !== "annulee" && o.status !== "non_honoree",
   );
 
   return (
     <ShopLayout>
-      <PageHeader title={`Bonjour, ${user.name}`} intro="Vos commandes et leur suivi." />
-      <div className="mx-auto max-w-4xl px-4 pb-24">
+      <PageHeader
+        index="Espace client"
+        title={`Bonjour, ${user?.name ?? ""}`}
+        intro="Vos commandes, leur suivi et vos pièces mises de côté."
+        aside={user?.email}
+      />
+
+      <div className="mx-auto max-w-5xl px-4 pb-24 sm:px-6">
         <div className="flex flex-wrap gap-3">
-          {user.isAdmin && (
-            <Link
-              to="/admin"
-              className="border border-border px-5 py-2.5 text-sm transition-colors hover:bg-muted"
-            >
+          {user?.isAdmin && (
+            <Link to="/admin" className="btn-square btn-solid">
               Back-office
             </Link>
           )}
+          <Link to="/boutique" className="btn-square btn-outline border-border">
+            Continuer mes achats
+          </Link>
           <button
-            onClick={() => {
-              // Revenir au formulaire de connexion : quelqu'un qui vient de se
-              // déconnecter veut se reconnecter, pas créer un second compte.
-              setMode("login");
-              setMethode("motdepasse");
-              void signOut();
-            }}
-            className="border border-border px-5 py-2.5 text-sm transition-colors hover:bg-muted"
+            type="button"
+            onClick={onDeconnexion}
+            className="btn-square btn-outline border-border"
           >
             Se déconnecter
           </button>
         </div>
 
-        {myOrders.length === 0 ? (
-          <p className="mt-12 text-sm text-muted-foreground">
-            Aucune commande pour l'instant.{" "}
-            <Link to="/boutique" className="underline">
+        {/* Trois repères, lus d'un coup d'œil : combien de commandes, combien en route,
+            combien d'articles mis de côté. */}
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          <Repere valeur={isPending ? "…" : String(commandes.length)} libelle="Commandes passées" />
+          <Repere
+            valeur={isPending ? "…" : String(enCours.length)}
+            libelle="En cours de livraison"
+          />
+          <Repere
+            valeur={String(favoris.length)}
+            libelle="Pièces en favoris"
+            lien={favoris.length > 0 ? "/favoris" : undefined}
+          />
+        </div>
+
+        <h2 className="section-index mt-16">Mes commandes</h2>
+
+        {isError ? (
+          <div className="mt-6 border border-border p-8 text-center">
+            <p className="text-muted-foreground">Impossible de charger vos commandes.</p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="btn-square btn-outline mt-6 border-border"
+            >
+              Réessayer
+            </button>
+          </div>
+        ) : isPending ? (
+          <div className="mt-6 space-y-4">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-40 animate-pulse border border-border bg-muted/40" />
+            ))}
+          </div>
+        ) : commandes.length === 0 ? (
+          <div className="mt-6 border border-border p-10 text-center">
+            <p className="text-lg">Aucune commande pour l'instant.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Vos commandes apparaîtront ici, avec leur suivi.
+            </p>
+            <Link to="/boutique" className="btn-square btn-solid mt-8">
               Découvrir la boutique
             </Link>
-          </p>
+          </div>
         ) : (
-          <div className="mt-10 space-y-6">
-            {myOrders.map((o) => (
-              <article key={o.id} className="border border-border p-6">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="font-mono text-sm tracking-wider">{o.number}</h2>
-                  <span className="text-sm text-muted-foreground">{formatDate(o.createdAt)}</span>
+          <div className="mt-6 space-y-6">
+            {commandes.map((o) => (
+              <article key={o.id} className="border border-border bg-background">
+                <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border px-6 py-4">
+                  <div>
+                    <h3 className="font-mono text-sm tracking-wider">{o.number}</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {formatDate(o.createdAt)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-mono">{formatFcfa(o.total)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {o.paid ? "Encaissée" : "À régler à la livraison"}
+                    </p>
+                  </div>
                 </div>
-                <p className="mt-1 text-sm">
-                  {statusLabels[o.status]} — {formatFcfa(o.total)}{" "}
-                  {o.paid ? "(encaissée)" : "(à payer à la livraison)"}
-                </p>
-                <div className="mt-5">
+
+                {/* Les articles avec leur vignette : on reconnaît sa commande sans
+                    avoir à lire le détail ligne à ligne. */}
+                <ul className="flex flex-wrap gap-4 px-6 py-5">
+                  {o.items.map((i) => (
+                    <li key={`${o.id}-${i.productId}`} className="flex items-center gap-3">
+                      {i.image ? (
+                        <img
+                          src={i.image}
+                          alt=""
+                          loading="lazy"
+                          className="h-14 w-14 shrink-0 bg-sand object-cover"
+                        />
+                      ) : (
+                        <span className="h-14 w-14 shrink-0 bg-sand" />
+                      )}
+                      <span className="text-sm">
+                        <span className="block max-w-[16rem] truncate">{i.name}</span>
+                        <span className="text-muted-foreground">
+                          {i.quantity} × {formatFcfa(i.price)}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="border-t border-border px-6 py-5">
+                  <p className="label-mono mb-4 text-muted-foreground">{statusLabels[o.status]}</p>
                   <OrderTimeline status={o.status} />
+                  <p className="mt-5 text-xs text-muted-foreground">
+                    Livraison à {o.delivery.areaName}, {o.delivery.regionName}
+                  </p>
                 </div>
               </article>
             ))}
@@ -379,4 +484,30 @@ function Compte() {
       </div>
     </ShopLayout>
   );
+}
+
+/** Chiffre-clé de l'espace client, cliquable quand il mène quelque part. */
+function Repere({
+  valeur,
+  libelle,
+  lien,
+}: {
+  valeur: string;
+  libelle: string;
+  lien?: string | undefined;
+}) {
+  const contenu = (
+    <>
+      <p className="title-lg">{valeur}</p>
+      <p className="label-mono mt-1 text-muted-foreground">{libelle}</p>
+    </>
+  );
+  if (lien === "/favoris") {
+    return (
+      <Link to="/favoris" className="border border-border p-6 transition-colors hover:bg-muted">
+        {contenu}
+      </Link>
+    );
+  }
+  return <div className="border border-border p-6">{contenu}</div>;
 }
