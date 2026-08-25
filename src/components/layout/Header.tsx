@@ -1,6 +1,6 @@
-import { Link } from "@tanstack/react-router";
-import { Heart, Menu, ShoppingBag, User, X } from "lucide-react";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
+import { useRef, useState } from "react";
 const logo = "/images/logo-decorek.png";
 import { useStore } from "@/lib/store";
 
@@ -13,8 +13,23 @@ const links = [
 
 export function Header() {
   const { cartCount, favoris } = useStore();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [barVisible, setBarVisible] = useState(true);
+  const [recherche, setRecherche] = useState(false);
+  const [terme, setTerme] = useState("");
+  const champ = useRef<HTMLInputElement>(null);
+
+  // La boutique sait déjà chercher : l'en-tête ne fait que l'y emmener avec le terme
+  // saisi, plutôt que d'ouvrir un second moteur à tenir en parallèle.
+  const lancer = (evenement: React.FormEvent): void => {
+    evenement.preventDefault();
+    const q = terme.trim();
+    if (!q) return;
+    setRecherche(false);
+    setOpen(false);
+    void navigate({ to: "/boutique", search: { q } });
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-background">
@@ -72,6 +87,22 @@ export function Header() {
 
           {/* Actions — à droite sur mobile et desktop */}
           <div className="order-3 flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                setRecherche((v) => !v);
+                // Le champ prend le curseur à l'ouverture : sans cela, il faut viser
+                // une seconde fois, au doigt, sur un écran de téléphone.
+                setTimeout(() => champ.current?.focus(), 0);
+              }}
+              className="grid h-10 w-10 place-items-center transition-colors hover:bg-muted"
+              // Distinct du bouton d'envoi, qui s'appelle « Rechercher » : deux
+              // commandes du même nom dans la même zone sont ambiguës à la voix.
+              aria-label={recherche ? "Fermer la recherche" : "Ouvrir la recherche"}
+              aria-expanded={recherche}
+            >
+              <Search className="h-5 w-5" strokeWidth={1.4} />
+            </button>
             <Link
               to="/compte"
               className="grid h-10 w-10 place-items-center transition-colors hover:bg-muted"
@@ -106,6 +137,32 @@ export function Header() {
           </div>
         </div>
       </div>
+
+      {recherche && (
+        <form
+          onSubmit={lancer}
+          role="search"
+          className="border-b border-border bg-background px-4 py-3 sm:px-6"
+        >
+          <div className="mx-auto flex max-w-7xl items-center gap-2">
+            <input
+              ref={champ}
+              type="search"
+              value={terme}
+              onChange={(e) => setTerme(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setRecherche(false);
+              }}
+              placeholder="Rechercher un article…"
+              aria-label="Rechercher un article"
+              className="h-10 min-w-0 flex-1 border border-input bg-background px-3 text-sm"
+            />
+            <button type="submit" className="btn-square btn-solid h-10">
+              Rechercher
+            </button>
+          </div>
+        </form>
+      )}
 
       {open && (
         <nav className="border-b border-border bg-background px-4 py-2 md:hidden">
