@@ -202,6 +202,27 @@
   line-height: 1.4;
 }
 
+/*
+ * Liens du menu principal.
+ *
+ * Ils reprenaient `label-mono` : 11 px en gris moyen, sous le seuil de confort de
+ * lecture — d'autant que la boutique se consulte au téléphone, souvent dehors. Trois
+ * réglages y remédient, du plus efficace au moins : la couleur pleine plutôt que le
+ * gris, la taille, puis la graisse. L'interlettrage est resserré car ce qui aère
+ * agréablement 11 px disperse le mot à 13.
+ *
+ * Classe distincte plutôt que `label-mono` élargie : cette dernière habille aussi les
+ * badges, index et intitulés de tout le site, où la petite taille est voulue.
+ */
+@utility nav-lien {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 @utility section-index {
   font-family: var(--font-mono);
   font-size: 0.6875rem;

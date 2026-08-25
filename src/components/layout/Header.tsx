@@ -62,7 +62,7 @@ export function Header() {
               <Link
                 key={l.to}
                 to={l.to}
-                className="label-mono text-muted-foreground transition-colors hover:text-foreground"
+                className="nav-lien text-foreground/80 transition-colors hover:text-foreground"
                 activeProps={{ className: "text-orange-brand border-b border-orange-brand" }}
               >
                 {l.label}
@@ -114,7 +114,7 @@ export function Header() {
               key={l.to}
               to={l.to}
               onClick={() => setOpen(false)}
-              className="label-mono block border-b border-border/60 py-4 last:border-0"
+              className="nav-lien block border-b border-border/60 py-4 last:border-0"
             >
               {l.label}
             </Link>
