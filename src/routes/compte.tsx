@@ -6,6 +6,7 @@ import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OrderTimeline } from "@/components/shop/OrderTimeline";
+import { RecapMontants } from "@/components/shop/RecapMontants";
 import { MesAdresses } from "@/components/compte/MesAdresses";
 import { MesInformations } from "@/components/compte/MesInformations";
 import { formatDate, formatFcfa } from "@/lib/format";
@@ -481,6 +482,12 @@ function EspaceClient({ onDeconnexion }: { onDeconnexion: () => void }) {
                     </li>
                   ))}
                 </ul>
+
+                <div className="border-t border-border px-6 pb-5">
+                  {/* Le détail des montants : sans lui, un article à 24 000 suivi d'un
+                      total de 23 600 se lit comme une erreur de la boutique. */}
+                  <RecapMontants order={o} />
+                </div>
 
                 <div className="border-t border-border px-6 py-5">
                   <p className="label-mono mb-4 text-muted-foreground">{statusLabels[o.status]}</p>

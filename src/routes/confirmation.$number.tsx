@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckCircle2 } from "lucide-react";
 import { ShopLayout } from "@/components/layout/ShopLayout";
+import { RecapMontants } from "@/components/shop/RecapMontants";
 import { formatFcfa, formatDate } from "@/lib/format";
 import { useStore } from "@/lib/store";
 
@@ -61,10 +62,7 @@ function Confirmation() {
               ))}
             </ul>
 
-            <div className="mt-4 flex justify-between border-t border-border pt-4">
-              <span>Total à payer à la livraison</span>
-              <span>{formatFcfa(order.total)}</span>
-            </div>
+            <RecapMontants order={order} libelleTotal="Total à payer à la livraison" />
             <p className="mt-4 text-muted-foreground">
               Livraison : {order.delivery.areaName}, {order.delivery.regionName} —{" "}
               {order.delivery.address}

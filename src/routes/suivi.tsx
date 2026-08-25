@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
+import { RecapMontants } from "@/components/shop/RecapMontants";
 import { Input } from "@/components/ui/input";
 import { OrderTimeline } from "@/components/shop/OrderTimeline";
 import { formatFcfa, formatDate } from "@/lib/format";
@@ -119,10 +120,7 @@ function Suivi() {
               ))}
             </ul>
 
-            <div className="mt-4 flex justify-between border-t border-border pt-4 text-sm">
-              <span>Total</span>
-              <span>{formatFcfa(order.total)}</span>
-            </div>
+            <RecapMontants order={order} />
           </div>
         )}
       </div>
