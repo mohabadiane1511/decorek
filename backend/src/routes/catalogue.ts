@@ -10,6 +10,7 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 type ProduitEnBase = {
   id: string;
   slug: string;
+  sku: string | null;
   name: string;
   categoryId: string;
   price: number;
@@ -33,6 +34,7 @@ export function versProduit(p: ProduitEnBase): Product {
   return {
     id: p.id,
     slug: p.slug,
+    sku: p.sku ?? undefined,
     name: p.name,
     categoryId: p.categoryId,
     price: p.price,

@@ -18,6 +18,7 @@ import {
 } from "../storage.js";
 import { versContenu } from "./contenu.js";
 import { versProduit } from "./catalogue.js";
+import { construireClasseur, nomFichier } from "../export.js";
 
 /** Transforme un nom en identifiant d'URL : minuscules, sans accents, tirets. */
 export function slugifier(nom: string): string {
@@ -68,6 +69,9 @@ const STATUTS = [
 
 const schemaProduit = z.object({
   name: z.string().trim().min(2).max(160),
+  // Laissée vide, la référence est attribuée par le serveur. Le format est libre :
+  // la cliente peut vouloir reprendre celui de son fournisseur.
+  sku: z.string().trim().max(40).optional(),
   categoryId: z.string().min(1),
   price: z.coerce.number().int().min(0),
   oldPrice: z.coerce.number().int().min(0).nullable().optional(),
@@ -193,6 +197,30 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
     return c.json(prepare);
   });
 
+  // ------------------------------------------------------------------ Export
+
+  routes.get("/admin/export", async (c) => {
+    const lu = Number(c.req.query("jours"));
+    // Sans période, tout l'historique : c'est ce qu'on attend d'un inventaire annuel.
+    const depuis =
+      Number.isInteger(lu) && lu >= 1
+        ? new Date(Date.now() - Math.min(lu, 3650) * 86_400_000)
+        : undefined;
+
+    const classeur = await construireClasseur(prisma, { depuis });
+
+    // `new Response` plutôt que l'aide de Hono : celle-ci type son corps de façon
+    // trop stricte pour un tableau d'octets.
+    return new Response(classeur, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${nomFichier()}"`,
+        // Un inventaire daté ne doit pas être resservi depuis un cache intermédiaire.
+        "Cache-Control": "no-store",
+      },
+    });
+  });
+
   // ----------------------------------------------------------- Tableau de bord
 
   routes.get("/admin/statistiques", async (c) => {
@@ -280,9 +308,15 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
 
     // Jamais mis en cache, contrairement au catalogue public : l'équipe doit voir
     // l'effet de sa modification immédiatement, pas au bout de cinq minutes.
+    // Nom ou référence : au téléphone comme devant un carton, on a l'un ou l'autre.
     const where = q
-      ? { name: { contains: q, mode: "insensitive" as const } }
-      : ({} as Record<string, never>);
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" as const } },
+            { sku: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {};
 
     // L'écran des stocks met les articles à réassortir en tête. Le tri doit se faire
     // en base : trier les vingt lignes de la page en cours ne remonterait que le plus
@@ -317,6 +351,7 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
       const cree = await tx.product.create({
         data: {
           slug: await slugUnique(tx, slugifier(donnees.name)),
+          sku: donnees.sku && donnees.sku.length > 0 ? donnees.sku : await prochaineReference(tx),
           name: donnees.name,
           categoryId: donnees.categoryId,
           price: donnees.price,
@@ -367,6 +402,13 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
       return tx.product.update({
         where: { id },
         data: {
+          // Une référence effacée dans le formulaire n'est pas supprimée : elle a pu
+          // servir à étiqueter des cartons. On en attribue une si l'article n'en
+          // avait pas encore.
+          sku:
+            donnees.sku && donnees.sku.length > 0
+              ? donnees.sku
+              : (existant.sku ?? (await prochaineReference(tx))),
           name: donnees.name,
           categoryId: donnees.categoryId,
           price: donnees.price,
@@ -660,6 +702,26 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
   });
 
   return routes;
+}
+
+/**
+ * Attribue la prochaine référence d'article.
+ *
+ * Le compteur est incrémenté en base plutôt que déduit du nombre de produits : après
+ * une suppression, compter les lignes redonnerait une référence déjà attribuée, que
+ * la contrainte d'unicité refuserait — ou pire, qui désignerait deux articles
+ * différents dans deux exports successifs.
+ */
+async function prochaineReference(
+  tx: PrismaClient | Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
+): Promise<string> {
+  const compteur = await tx.skuCounter.upsert({
+    where: { id: 1 },
+    create: { id: 1, counter: 1 },
+    update: { counter: { increment: 1 } },
+    select: { counter: true },
+  });
+  return `DR-${String(compteur.counter).padStart(4, "0")}`;
 }
 
 /** Ajoute un suffixe numérique tant que le slug est déjà pris. */

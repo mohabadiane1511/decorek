@@ -661,6 +661,20 @@ function Products() {
             />
           </div>
           <div>
+            <Label htmlFor="produit-sku">Référence</Label>
+            <Input
+              id="produit-sku"
+              value={draft.sku ?? ""}
+              onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
+              placeholder="Attribuée automatiquement si vide"
+              className="mt-1.5 rounded-none"
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Sert à l'inventaire et aux commandes fournisseur. Vous pouvez reprendre celle de votre
+              fournisseur.
+            </p>
+          </div>
+          <div>
             <Label htmlFor="produit-categorie">Catégorie</Label>
             <select
               id="produit-categorie"
@@ -851,6 +865,7 @@ function Products() {
         <table className="w-full text-sm">
           <thead className="border-b border-border label-mono text-left text-muted-foreground">
             <tr>
+              <th className="px-4 py-3">Référence</th>
               <th className="px-4 py-3">Produit</th>
               <th className="px-4 py-3">Catégorie</th>
               <th className="px-4 py-3">Prix</th>
@@ -861,6 +876,9 @@ function Products() {
           <tbody className="divide-y divide-border">
             {products.map((p) => (
               <tr key={p.id}>
+                <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-muted-foreground">
+                  {p.sku ?? "—"}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     {p.images[0] && (
@@ -918,6 +936,20 @@ function Stock() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Corrigez un stock en saisissant la quantité réellement en rayon.
+        </p>
+        <a
+          href="/api/admin/export"
+          className="btn-square btn-outline border-border"
+          // Lien plutôt que requête : le navigateur enregistre le fichier lui-même,
+          // sans le charger d'abord en mémoire.
+        >
+          Exporter en Excel
+        </a>
+      </div>
+
       <BarreListe
         identifiant="recherche-stocks"
         invite="Nom de l'article…"

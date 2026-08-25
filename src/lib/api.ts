@@ -152,6 +152,8 @@ export type LigneDemandee = { productId: string; quantity: number };
 /** Ce que le back-office envoie pour créer ou modifier un produit. */
 export type EntreeProduit = {
   name: string;
+  /** Laissée vide, la référence est attribuée par le serveur. */
+  sku?: string | undefined;
   categoryId: string;
   price: number;
   oldPrice?: number | null;

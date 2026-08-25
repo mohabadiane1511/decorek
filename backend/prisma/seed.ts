@@ -58,11 +58,17 @@ export async function semer(databaseUrl: string): Promise<void> {
       categoriesParAncienId.set(c.id, enBase.id);
     }
 
+    // Les références suivent l'ordre du jeu de données, et le compteur repart de là :
+    // sans cela, le premier article créé après un amorçage reprendrait « DR-0001 ».
+    let rang = 0;
+
     for (const p of seedProducts) {
       const categoryId = categoriesParAncienId.get(p.categoryId);
       if (!categoryId) throw new Error(`Catégorie inconnue pour le produit ${p.slug}`);
+      rang += 1;
 
       const donnees = {
+        sku: `DR-${String(rang).padStart(4, "0")}`,
         name: p.name,
         categoryId,
         price: p.price,
@@ -89,6 +95,12 @@ export async function semer(databaseUrl: string): Promise<void> {
         data: urls.map((url, position) => ({ productId: produit.id, url, position })),
       });
     }
+
+    await prisma.skuCounter.upsert({
+      where: { id: 1 },
+      create: { id: 1, counter: rang },
+      update: { counter: rang },
+    });
 
     for (const r of seedRegions) {
       const region = await prisma.deliveryRegion.upsert({

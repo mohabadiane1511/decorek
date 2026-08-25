@@ -8,6 +8,8 @@ export type Category = {
 export type Product = {
   id: string;
   slug: string;
+  /** Référence interne, attribuée par le serveur. Absente des articles d'avant. */
+  sku?: string | undefined;
   name: string;
   categoryId: string;
   price: number; // FCFA

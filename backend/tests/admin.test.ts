@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import ExcelJS from "exceljs";
 import type { Order } from "../../src/data/types.js";
 import { lirePagination, slugifier } from "../src/routes/admin.js";
 import { retientLeStock } from "../src/stock.js";
@@ -728,5 +729,221 @@ describe("statistiques du tableau de bord", () => {
   it("refuse les statistiques à qui n'est pas administrateur", async () => {
     expect((await appeler("GET", "/api/admin/statistiques")).status).toBe(401);
     expect((await appeler("GET", "/api/admin/statistiques", cookieClient)).status).toBe(403);
+  });
+});
+
+describe("références d'articles", () => {
+  it("attribue une référence à un article qui n'en propose pas", async () => {
+    const categorie = await contexte.prisma.category.findFirstOrThrow();
+    const reponse = await appeler("POST", "/api/admin/produits", cookieAdmin, {
+      name: "Photophore ambré",
+      categoryId: categorie.id,
+      price: 12000,
+      stock: 3,
+      lowStockThreshold: 1,
+      description: "",
+      featured: false,
+      images: [],
+    });
+    expect(reponse.status).toBe(201);
+    const { sku } = (await reponse.json()) as { sku: string };
+    expect(sku).toMatch(/^DR-\d{4}$/);
+  });
+
+  it("ne réattribue jamais une référence libérée par une suppression", async () => {
+    // Déduire la référence du nombre d'articles redonnerait celle d'un produit
+    // supprimé : deux exports successifs désigneraient alors des articles différents
+    // sous le même code.
+    const categorie = await contexte.prisma.category.findFirstOrThrow();
+    const creer = (nom: string) =>
+      appeler("POST", "/api/admin/produits", cookieAdmin, {
+        name: nom,
+        categoryId: categorie.id,
+        price: 1000,
+        stock: 1,
+        lowStockThreshold: 1,
+        description: "",
+        featured: false,
+        images: [],
+      });
+
+    const premier = (await (await creer("Premier")).json()) as { id: string; sku: string };
+    await appeler("DELETE", `/api/admin/produits/${premier.id}`, cookieAdmin);
+    const second = (await (await creer("Second")).json()) as { sku: string };
+
+    expect(second.sku).not.toBe(premier.sku);
+  });
+
+  it("accepte une référence choisie par l'équipe", async () => {
+    const categorie = await contexte.prisma.category.findFirstOrThrow();
+    const reponse = await appeler("POST", "/api/admin/produits", cookieAdmin, {
+      name: "Article fournisseur",
+      sku: "FOURN-77",
+      categoryId: categorie.id,
+      price: 1000,
+      stock: 1,
+      lowStockThreshold: 1,
+      description: "",
+      featured: false,
+      images: [],
+    });
+    expect(((await reponse.json()) as { sku: string }).sku).toBe("FOURN-77");
+  });
+
+  it("explique le refus d'une référence déjà prise", async () => {
+    const categorie = await contexte.prisma.category.findFirstOrThrow();
+    const existant = await contexte.prisma.product.findFirstOrThrow({ where: { sku: "DR-0001" } });
+
+    const reponse = await appeler("POST", "/api/admin/produits", cookieAdmin, {
+      name: "Doublon",
+      sku: existant.sku!,
+      categoryId: categorie.id,
+      price: 1000,
+      stock: 1,
+      lowStockThreshold: 1,
+      description: "",
+      featured: false,
+      images: [],
+    });
+
+    // Sans message dédié, la cliente lirait « une erreur interne est survenue » et ne
+    // saurait pas que la correction lui appartient.
+    expect(reponse.status).toBe(409);
+    const corps = (await reponse.json()) as { error: { message: string } };
+    expect(corps.error.message).toMatch(/référence est déjà utilisée/i);
+  });
+
+  it("conserve la référence quand le formulaire la renvoie vide", async () => {
+    const produit = await contexte.prisma.product.findFirstOrThrow({ where: { sku: "DR-0002" } });
+    const reponse = await appeler("PUT", `/api/admin/produits/${produit.id}`, cookieAdmin, {
+      name: produit.name,
+      sku: "",
+      categoryId: produit.categoryId,
+      price: produit.price,
+      stock: produit.stock,
+      lowStockThreshold: produit.lowStockThreshold,
+      description: produit.description,
+      featured: produit.featured,
+      images: [],
+    });
+    // La référence a pu servir à étiqueter des cartons : l'effacer par mégarde dans le
+    // formulaire ne doit pas la détruire.
+    expect(((await reponse.json()) as { sku: string }).sku).toBe("DR-0002");
+  });
+
+  it("retrouve un article par sa référence", async () => {
+    const reponse = await appeler("GET", "/api/admin/produits?q=DR-0003", cookieAdmin);
+    const { items } = (await reponse.json()) as { items: { sku: string }[] };
+    expect(items).toHaveLength(1);
+    expect(items[0]!.sku).toBe("DR-0003");
+  });
+});
+
+describe("export du classeur", () => {
+  async function relire(reponse: Response): Promise<ExcelJS.Workbook> {
+    const octets = await reponse.arrayBuffer();
+    const classeur = new ExcelJS.Workbook();
+    await classeur.xlsx.load(octets);
+    return classeur;
+  }
+
+  it("sert un classeur lisible, avec ses deux feuilles", async () => {
+    await commander();
+    const reponse = await appeler("GET", "/api/admin/export", cookieAdmin);
+
+    expect(reponse.status).toBe(200);
+    expect(reponse.headers.get("content-type")).toContain("spreadsheetml");
+    expect(reponse.headers.get("content-disposition")).toMatch(/\.xlsx"$/);
+
+    // Le fichier est vraiment relu : un octet mal formé rendrait l'export inutilisable
+    // sans qu'un contrôle d'en-tête s'en aperçoive.
+    const classeur = await relire(reponse);
+    expect(classeur.worksheets.map((f) => f.name)).toEqual(["Inventaire", "Ventes"]);
+  });
+
+  it("écrit les montants en nombres, pas en texte", async () => {
+    const reponse = await appeler("GET", "/api/admin/export", cookieAdmin);
+    const inventaire = (await relire(reponse)).getWorksheet("Inventaire")!;
+
+    // « 12 000 FCFA » écrit en toutes lettres empêcherait la moindre somme : c'est
+    // précisément ce qu'on attend d'un inventaire.
+    const prix = inventaire.getRow(2).getCell("D").value;
+    expect(typeof prix).toBe("number");
+    const valeur = inventaire.getRow(2).getCell("I").value;
+    expect(typeof valeur).toBe("number");
+  });
+
+  it("reprend chaque article du catalogue", async () => {
+    const reponse = await appeler("GET", "/api/admin/export", cookieAdmin);
+    const inventaire = (await relire(reponse)).getWorksheet("Inventaire")!;
+    const attendus = await contexte.prisma.product.count();
+
+    // rowCount inclut la ligne d'en-têtes.
+    expect(inventaire.rowCount - 1).toBe(attendus);
+  });
+
+  it("n'expose jamais la note interne de l'équipe", async () => {
+    const commande = await commander();
+    await contexte.prisma.order.update({
+      where: { id: commande.id },
+      data: { internalNote: "Cliente difficile, exiger un acompte" },
+    });
+
+    const reponse = await appeler("GET", "/api/admin/export", cookieAdmin);
+    const ventes = (await relire(reponse)).getWorksheet("Ventes")!;
+
+    // Le fichier peut être transmis à un comptable ou à un tiers : ce qui sert à
+    // l'équipe n'a pas à voyager avec lui.
+    let trouve = false;
+    ventes.eachRow((ligne) => {
+      if (JSON.stringify(ligne.values).includes("acompte")) trouve = true;
+    });
+    expect(trouve).toBe(false);
+  });
+
+  it("neutralise un nom d'article qu'un tableur prendrait pour une formule", async () => {
+    const categorie = await contexte.prisma.category.findFirstOrThrow();
+    await contexte.prisma.product.create({
+      data: {
+        slug: "article-formule",
+        sku: "DR-9001",
+        name: "=1+1",
+        categoryId: categorie.id,
+        price: 1000,
+        stock: 1,
+        lowStockThreshold: 1,
+        description: "",
+      },
+    });
+
+    const reponse = await appeler("GET", "/api/admin/export", cookieAdmin);
+    const inventaire = (await relire(reponse)).getWorksheet("Inventaire")!;
+
+    let cellule: unknown = null;
+    inventaire.eachRow((ligne) => {
+      const valeur = ligne.getCell("B").value;
+      if (typeof valeur === "string" && valeur.includes("1+1")) cellule = valeur;
+    });
+    // Réenregistré en CSV — ce que fait volontiers un comptable — « =1+1 » deviendrait
+    // une formule exécutée à l'ouverture.
+    expect(cellule).toBe("'=1+1");
+  });
+
+  it("limite l'export à la période demandée", async () => {
+    const ancienne = await commander();
+    await contexte.prisma.order.update({
+      where: { id: ancienne.id },
+      data: { createdAt: new Date(Date.now() - 60 * 86_400_000) },
+    });
+
+    const surTrenteJours = await appeler("GET", "/api/admin/export?jours=30", cookieAdmin);
+    const ventes = (await relire(surTrenteJours)).getWorksheet("Ventes")!;
+    expect(ventes.rowCount - 1).toBe(0);
+  });
+
+  it("refuse l'export à qui n'est pas administrateur", async () => {
+    // Le classeur contient nom, téléphone et adresse de chaque cliente.
+    expect((await appeler("GET", "/api/admin/export")).status).toBe(401);
+    expect((await appeler("GET", "/api/admin/export", cookieClient)).status).toBe(403);
   });
 });

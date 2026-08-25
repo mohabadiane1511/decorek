@@ -37,6 +37,11 @@ model Category {
 model Product {
   id                String   @id @default(cuid())
   slug              String   @unique
+  // Référence interne, unique et courte : elle sert à l'inventaire physique, aux
+  // commandes fournisseur et au téléphone, là où décrire l'article est laborieux.
+  // Facultative en base : les articles créés avant son introduction n'en avaient pas,
+  // et Postgres autorise plusieurs valeurs nulles sous une contrainte d'unicité.
+  sku               String?  @unique
   name              String
   categoryId        String   @map("category_id")
   price             Int
@@ -383,4 +388,14 @@ model OrderNumberCounter {
   counter Int    @default(0)
 
   @@map("order_number_counters")
+}
+
+/// Attribue les références d'articles. Une seule ligne, incrémentée en transaction :
+/// compter les produits existants donnerait deux fois la même référence après une
+/// suppression.
+model SkuCounter {
+  id      Int @id @default(1)
+  counter Int @default(0)
+
+  @@map("sku_counters")
 }

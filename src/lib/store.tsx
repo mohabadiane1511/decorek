@@ -316,6 +316,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       saveProduct: async (product) => {
         const entree = {
           name: product.name,
+          ...(product.sku !== undefined ? { sku: product.sku } : {}),
           categoryId: product.categoryId,
           price: product.price,
           oldPrice: product.oldPrice ?? null,
