@@ -111,12 +111,20 @@ function ProductPage() {
         </nav>
 
         <div className="mt-6 grid gap-10 md:grid-cols-2">
-          <div className="mx-auto aspect-[4/5] w-full max-w-[560px] overflow-hidden bg-sand">
+          <div className="relative mx-auto aspect-[4/5] w-full max-w-[560px] overflow-hidden bg-sand">
             <img
               src={product.images[0]}
               alt={product.name}
               className="h-full w-full object-cover"
             />
+            {/* Même place et même allure que sur la vignette du catalogue : la cliente
+                qui ouvre la fiche cherche le badge là où elle vient de le voir. Sans
+                lui, la fiche affichait deux prix sans dire qu'il s'agit d'une remise. */}
+            {product.oldPrice && (
+              <span className="label-mono absolute top-3 left-3 bg-orange-brand px-2 py-1 text-white">
+                Promo
+              </span>
+            )}
           </div>
 
           <div>

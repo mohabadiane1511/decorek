@@ -140,13 +140,14 @@ test("un prix barré déclenche le badge Promo en boutique", async ({ page }) =>
   await page.getByRole("button", { name: /Enregistrer/ }).click();
   await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
 
-  // La fiche affiche l'ancien prix barré.
+  // La fiche annonce la remise : le badge et l'ancien prix barré. Sans le badge, elle
+  // affichait deux prix sans dire lequel s'applique ni pourquoi.
   await page.goto("/produit/housse-canape-matelassee");
   await expect(page.getByText(/12 000 FCFA/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Promo").first()).toBeVisible();
 
-  // Le badge, lui, ne vit que sur les cartes du catalogue. On passe par la catégorie
-  // de l'article plutôt que par la boutique entière, dont la première page dépend des
-  // produits créés par les autres tests.
+  // Le catalogue le montre aussi. On passe par la catégorie de l'article plutôt que par
+  // la boutique entière, dont la première page dépend des produits créés ailleurs.
   await page.goto("/boutique?categorie=textile-maison");
   const carte = page.locator("article", { hasText: "Housse de canapé matelassée" }).first();
   await expect(carte.getByText("Promo")).toBeVisible({ timeout: 15_000 });
