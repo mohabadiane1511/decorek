@@ -7,6 +7,7 @@ export type Session = {
   userId: string;
   email: string;
   name: string;
+  phone?: string | undefined;
   estAdmin: boolean;
 };
 
@@ -25,15 +26,18 @@ export async function lireSession(
   const resultat = await auth.api.getSession({ headers: c.req.raw.headers });
   if (!resultat?.user) return null;
 
-  const roles = await prisma.userRole.findMany({
-    where: { userId: resultat.user.id },
-    select: { role: true },
-  });
+  const [roles, profil] = await Promise.all([
+    prisma.userRole.findMany({ where: { userId: resultat.user.id }, select: { role: true } }),
+    // Le téléphone ne figure pas dans la session de Better Auth : il est relu ici pour
+    // que les écrans qui pré-remplissent un formulaire l'aient sous la main.
+    prisma.user.findUnique({ where: { id: resultat.user.id }, select: { phone: true } }),
+  ]);
 
   return {
     userId: resultat.user.id,
     email: resultat.user.email,
     name: resultat.user.name,
+    phone: profil?.phone ?? undefined,
     estAdmin: roles.some((r) => r.role === "admin"),
   };
 }

@@ -78,6 +78,8 @@ type StoreValue = State & {
   signIn: (email: string, motDePasse: string) => Promise<void>;
   inscrire: (nom: string, email: string, motDePasse: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Relit la session au serveur, après une modification du profil par exemple. */
+  rafraichirSession: () => Promise<void>;
   validatePromo: (
     code: string,
     subtotal: number,
@@ -249,6 +251,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const utilisateur = await api.moi();
         patch((s) => ({ ...s, user: utilisateur }));
       },
+      rafraichirSession: async () => {
+        // Relue au serveur plutôt que recopiée depuis la réponse : c'est lui qui
+        // décide de ce que porte une session, rôle compris.
+        const utilisateur = await api.moi();
+        patch((s) => ({ ...s, user: utilisateur }));
+      },
+
       signOut: async () => {
         await api.deconnecter().catch(() => undefined);
         patch((s) => ({ ...s, user: null }));

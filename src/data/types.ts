@@ -120,5 +120,28 @@ export type SiteContent = {
 export type SessionUser = {
   name: string;
   email: string;
+  phone?: string | undefined;
   isAdmin: boolean;
+};
+
+/**
+ * Adresse enregistrée dans le carnet de la cliente.
+ *
+ * `areaId` peut être absent : la zone de livraison qu'elle désignait a pu être retirée
+ * du catalogue. L'adresse reste alors lisible, mais demande à être revue avant de
+ * servir — elle ne peut plus annoncer de frais.
+ */
+export type Address = {
+  id: string;
+  label: string;
+  fullName: string;
+  phone: string;
+  areaId?: string | undefined;
+  regionId?: string | undefined;
+  regionName?: string | undefined;
+  areaName?: string | undefined;
+  fee?: number | undefined;
+  address: string;
+  note?: string | undefined;
+  isDefault: boolean;
 };

@@ -95,7 +95,8 @@ model DeliveryArea {
   regionId String         @map("region_id")
   name     String
   fee      Int
-  region   DeliveryRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  region    DeliveryRegion @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  addresses Address[]
 
   @@unique([regionId, name])
   @@map("delivery_areas")
@@ -269,6 +270,9 @@ model User {
   id            String   @id @default(cuid())
   email         String   @unique
   name          String
+  // Renseigné dans l'espace client, jamais exigé : on ne le connaît qu'après une
+  // première commande, et l'inscription ne le demande pas.
+  phone         String?
   emailVerified Boolean  @default(false) @map("email_verified")
   image         String?
   createdAt     DateTime @default(now()) @map("created_at")
@@ -279,8 +283,38 @@ model User {
   redemptions PromoRedemption[]
   sessions    Session[]
   accounts    Account[]
+  addresses   Address[]
 
   @@map("users")
+}
+
+/// Carnet d'adresses de livraison.
+///
+/// Contrairement à une commande passée, qui fige le nom de sa zone et ses frais, une
+/// adresse enregistrée pointe vers la zone vivante : les tarifs évoluent, et une
+/// adresse doit refléter ce qui sera facturé la prochaine fois. Si la zone disparaît
+/// du catalogue de livraison, le lien se dénoue et l'adresse demande à être revue
+/// plutôt que d'annoncer un tarif qui n'existe plus.
+model Address {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  /// Nom donné par la cliente : « Maison », « Bureau », « Chez ma sœur ».
+  label     String
+  fullName  String   @map("full_name")
+  phone     String
+  areaId    String?  @map("area_id")
+  address   String
+  note      String?
+  /// Proposée d'office au moment de commander. Une seule à la fois, tenue par le code.
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area DeliveryArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("addresses")
 }
 
 // Sessions également conservées en base, alors que Redis les sert au quotidien : un

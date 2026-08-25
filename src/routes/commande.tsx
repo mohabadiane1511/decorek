@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { formatFcfa } from "@/lib/format";
 import { api } from "@/lib/api";
 import { useStore } from "@/lib/store";
-import type { Order } from "@/data/types";
+import type { Address, Order } from "@/data/types";
 
 export const Route = createFileRoute("/commande")({
   head: () => ({
@@ -34,7 +35,7 @@ function Commande() {
   const navigate = useNavigate();
 
   const [name, setName] = useState(user?.name ?? "");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(user?.phone ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [regionId, setRegionId] = useState("");
   const [areaId, setAreaId] = useState("");
@@ -47,6 +48,37 @@ function Commande() {
     setRegionId(premiere.id);
     setAreaId(premiere.areas[0]?.id ?? "");
   }, [regions, regionId]);
+
+  // Le carnet d'adresses n'est interrogé que pour une cliente connectée : une invitée
+  // n'en a pas, et la requête reviendrait avec un refus.
+  const { data: adresses } = useQuery({
+    queryKey: ["mes-adresses"],
+    queryFn: ({ signal }) => api.adresses(signal),
+    enabled: Boolean(user),
+  });
+  const [adresseChoisie, setAdresseChoisie] = useState<string | null>(null);
+
+  /** Recopie une adresse du carnet dans le formulaire, qui reste modifiable. */
+  const utiliserAdresse = (choisie: Address): void => {
+    setAdresseChoisie(choisie.id);
+    setName(choisie.fullName);
+    setPhone(choisie.phone);
+    if (choisie.regionId) setRegionId(choisie.regionId);
+    if (choisie.areaId) setAreaId(choisie.areaId);
+    setAddress(choisie.address);
+    if (choisie.note) setNote(choisie.note);
+  };
+
+  // L'adresse habituelle est reprise à l'ouverture, une fois seulement : la réappliquer
+  // ensuite écraserait ce que la cliente vient de corriger à la main.
+  const [adressePrise, setAdressePrise] = useState(false);
+  useEffect(() => {
+    if (adressePrise || !adresses || adresses.length === 0 || regions.length === 0) return;
+    const habituelle = adresses.find((a) => a.isDefault && a.areaId);
+    if (habituelle) utiliserAdresse(habituelle);
+    setAdressePrise(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adresses, regions, adressePrise]);
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
   const [code, setCode] = useState("");
@@ -164,6 +196,38 @@ function Commande() {
               </p>
             )}
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {adresses && adresses.length > 0 && (
+                <div className="sm:col-span-2 border border-border bg-sand p-4">
+                  <p className="label-mono text-muted-foreground">Mes adresses enregistrées</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {adresses.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => utiliserAdresse(a)}
+                        // Une adresse dont la zone n'est plus desservie ne peut pas
+                        // renseigner les frais : elle est proposée sans être cliquable.
+                        disabled={!a.areaId}
+                        className={`border px-4 py-2 text-left text-sm transition-colors disabled:opacity-40 ${
+                          adresseChoisie === a.id
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border bg-background hover:bg-muted"
+                        }`}
+                      >
+                        <span className="block">{a.label}</span>
+                        <span className="block text-xs opacity-70">
+                          {a.areaId ? a.areaName : "Zone à revoir"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Les champs restent modifiables : livrer ailleurs pour cette fois ne touche pas
+                    au carnet.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="name">Nom complet *</Label>
                 <Input

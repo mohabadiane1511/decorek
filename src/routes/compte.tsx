@@ -6,6 +6,8 @@ import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { OrderTimeline } from "@/components/shop/OrderTimeline";
+import { MesAdresses } from "@/components/compte/MesAdresses";
+import { MesInformations } from "@/components/compte/MesInformations";
 import { formatDate, formatFcfa } from "@/lib/format";
 import { api } from "@/lib/api";
 import { statusLabels, useStore } from "@/lib/store";
@@ -395,6 +397,16 @@ function EspaceClient({ onDeconnexion }: { onDeconnexion: () => void }) {
             libelle="Pièces en favoris"
             lien={favoris.length > 0 ? "/favoris" : undefined}
           />
+        </div>
+
+        <h2 className="section-index mt-16">Mes informations</h2>
+        <div className="mt-6">
+          <MesInformations />
+        </div>
+
+        <h2 className="section-index mt-16">Mes adresses de livraison</h2>
+        <div className="mt-6">
+          <MesAdresses />
         </div>
 
         <h2 className="section-index mt-16">Mes commandes</h2>

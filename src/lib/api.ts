@@ -1,4 +1,5 @@
 import type {
+  Address,
   Category,
   DeliveryRegion,
   Order,
@@ -182,6 +183,17 @@ export type DemandeCommande = {
   promoCode?: string | undefined;
 };
 
+/** Ce que l'espace client envoie pour enregistrer une adresse. */
+export type EntreeAdresse = {
+  label: string;
+  fullName: string;
+  phone: string;
+  areaId: string;
+  address: string;
+  note?: string | undefined;
+  isDefault?: boolean | undefined;
+};
+
 export type PageProduits = {
   items: Product[];
   total: number;
@@ -272,6 +284,22 @@ export const api = {
    */
   mesCommandes: (signal?: AbortSignal) =>
     appeler<{ items: Order[] }>("/api/mes-commandes", signal).then((r) => r.items),
+
+  // ------------------------------------------------------------ Espace client
+
+  /** Enregistre le nom et le téléphone. L'adresse e-mail n'est pas modifiable ici. */
+  majProfil: (profil: { name: string; phone?: string | undefined }) =>
+    envoyerMethode<SessionUser>("PATCH", "/api/compte/profil", profil),
+
+  adresses: (signal?: AbortSignal) =>
+    appeler<{ items: Address[] }>("/api/compte/adresses", signal).then((r) => r.items),
+
+  creerAdresse: (adresse: EntreeAdresse) => envoyer<Address>("/api/compte/adresses", adresse),
+
+  majAdresse: (id: string, adresse: EntreeAdresse) =>
+    envoyerMethode<Address>("PUT", `/api/compte/adresses/${id}`, adresse),
+
+  supprimerAdresse: (id: string) => envoyerMethode<unknown>("DELETE", `/api/compte/adresses/${id}`),
 
   // ---------------------------------------------------------- Administration
 
