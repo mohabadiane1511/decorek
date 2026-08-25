@@ -476,6 +476,38 @@ describe("contenu et livraison", () => {
     expect(contenu.tiktok).toBe("");
   });
 
+  it("ajoute une zone dont l'identifiant vient du navigateur", async () => {
+    // Le formulaire attribue un identifiant local aux nouvelles zones avant de les
+    // envoyer. Cet identifiant n'existe pas en base : le traiter comme une mise à
+    // jour fait échouer toute la transaction, et l'ajout est perdu sans que rien ne
+    // le signale.
+    const avant = await contexte.prisma.deliveryRegion.findFirstOrThrow({
+      where: { name: "Dakar" },
+      include: { areas: true },
+    });
+
+    const reponse = await appeler("PUT", "/api/admin/livraison", cookieAdmin, {
+      regions: [
+        {
+          id: avant.id,
+          name: avant.name,
+          areas: [
+            ...avant.areas.map((a) => ({ id: a.id, name: a.name, fee: a.fee })),
+            { id: "zoneabc123", name: "Sacré-Cœur", fee: 2000 },
+          ],
+        },
+      ],
+    });
+
+    expect(reponse.status).toBe(200);
+
+    const apres = await contexte.prisma.deliveryArea.findFirst({
+      where: { name: "Sacré-Cœur" },
+    });
+    expect(apres, "la zone doit être créée malgré son identifiant inconnu").not.toBeNull();
+    expect(apres?.fee).toBe(2000);
+  });
+
   it("remplace les zones de livraison", async () => {
     const reponse = await appeler("PUT", "/api/admin/livraison", cookieAdmin, {
       regions: [{ name: "Dakar", areas: [{ name: "Plateau", fee: 1500 }] }],

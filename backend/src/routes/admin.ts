@@ -396,22 +396,39 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
     const { regions } = c.req.valid("json");
 
     await prisma.$transaction(async (tx) => {
-      const conservees = regions.map((r) => r.id).filter((id): id is string => Boolean(id));
+      // Un identifiant venu du navigateur peut ne correspondre à rien : le formulaire
+      // en attribue un provisoire aux éléments qu'on vient d'ajouter. Le traiter comme
+      // une mise à jour faisait échouer toute la transaction, et l'ajout était perdu
+      // sans que rien ne le signale. On vérifie donc ce qui existe réellement.
+      const regionsConnues = new Set(
+        (await tx.deliveryRegion.findMany({ select: { id: true } })).map((r) => r.id),
+      );
+      const zonesConnues = new Set(
+        (await tx.deliveryArea.findMany({ select: { id: true } })).map((a) => a.id),
+      );
+
+      const conservees = regions
+        .map((r) => r.id)
+        .filter((id): id is string => id !== undefined && regionsConnues.has(id));
       await tx.deliveryRegion.deleteMany({
         where: conservees.length > 0 ? { id: { notIn: conservees } } : {},
       });
 
       for (const region of regions) {
-        const enregistree = region.id
+        // Identifiant retenu seulement s'il désigne une région existante ; sinon on
+        // crée, ce qui couvre aussi bien un ajout qu'un identifiant provisoire.
+        const idExistant =
+          region.id !== undefined && regionsConnues.has(region.id) ? region.id : undefined;
+        const enregistree = idExistant
           ? await tx.deliveryRegion.update({
-              where: { id: region.id },
+              where: { id: idExistant },
               data: { name: region.name },
             })
           : await tx.deliveryRegion.create({ data: { name: region.name } });
 
         const zonesGardees = region.areas
           .map((a) => a.id)
-          .filter((id): id is string => Boolean(id));
+          .filter((id): id is string => id !== undefined && zonesConnues.has(id));
         await tx.deliveryArea.deleteMany({
           where: {
             regionId: enregistree.id,
@@ -420,10 +437,12 @@ export function routesAdmin(prisma: PrismaClient, cache: Cache, auth: Auth, conf
         });
 
         for (const zone of region.areas) {
-          if (zone.id) {
+          const idZone = zone.id !== undefined && zonesConnues.has(zone.id) ? zone.id : undefined;
+          if (idZone) {
             await tx.deliveryArea.update({
-              where: { id: zone.id },
-              data: { name: zone.name, fee: zone.fee },
+              where: { id: idZone },
+              // La région peut changer si la zone a été déplacée.
+              data: { name: zone.name, fee: zone.fee, regionId: enregistree.id },
             });
           } else {
             await tx.deliveryArea.create({

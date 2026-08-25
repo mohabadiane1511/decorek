@@ -759,8 +759,9 @@ function Categories() {
       {draft && (
         <div className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-2">
           <div>
-            <Label>Nom</Label>
+            <Label htmlFor="categorie-nom">Nom</Label>
             <Input
+              id="categorie-nom"
               value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               className="mt-1.5 rounded-none"
@@ -866,8 +867,9 @@ function Promos() {
       {draft && (
         <div className="grid gap-4 border border-border bg-background p-6 sm:grid-cols-3">
           <div>
-            <Label>Code</Label>
+            <Label htmlFor="promo-code">Code</Label>
             <Input
+              id="promo-code"
               value={draft.code}
               onChange={(e) => setDraft({ ...draft, code: e.target.value.toUpperCase() })}
               className="mt-1.5 rounded-none"
@@ -1158,10 +1160,10 @@ function Delivery() {
             e.preventDefault();
             const name = newRegion.trim();
             if (!name) return;
-            // L'identifiant local est provisoire : le serveur en attribue un vrai et
-            // renvoie la liste, que le store remplace.
+            // Sans identifiant : le serveur en attribue un et renvoie la liste, que le
+            // store remplace.
             void enregistrer(
-              () => setRegions([...regions, { id: newId("reg"), name, areas: [] }]),
+              () => setRegions([...regions, { id: "", name, areas: [] }]),
               "Région ajoutée",
             );
             setNewRegion("");
@@ -1255,17 +1257,24 @@ function Delivery() {
                 e.preventDefault();
                 const name = draft.name.trim();
                 if (!name) return;
+                // Identifiant vide : le serveur y voit une création et en attribue un
+                // vrai. Un identifiant inventé ici le ferait chercher une ligne
+                // inexistante, ce qui faisait échouer tout l'enregistrement.
                 update(r.id, (reg) => ({
                   ...reg,
-                  areas: [...reg.areas, { id: newId("zone"), name, fee: Number(draft.fee) || 0 }],
+                  areas: [...reg.areas, { id: "", name, fee: Number(draft.fee) || 0 }],
                 }));
                 setAreaDraft({ ...areaDraft, [r.id]: { name: "", fee: "" } });
-                toast.success("Quartier ajouté");
+                // Le message de succès vient d'`update`, après réponse du serveur :
+                // l'afficher ici annoncerait un enregistrement qui peut échouer.
               }}
             >
               <div>
-                <Label className="label-mono">Quartier / ville</Label>
+                <Label className="label-mono" htmlFor={`zone-nom-${r.id}`}>
+                  Quartier / ville
+                </Label>
                 <Input
+                  id={`zone-nom-${r.id}`}
                   value={draft.name}
                   onChange={(e) =>
                     setAreaDraft({ ...areaDraft, [r.id]: { ...draft, name: e.target.value } })
@@ -1275,8 +1284,11 @@ function Delivery() {
                 />
               </div>
               <div>
-                <Label className="label-mono">Frais (FCFA)</Label>
+                <Label className="label-mono" htmlFor={`zone-frais-${r.id}`}>
+                  Frais (FCFA)
+                </Label>
                 <Input
+                  id={`zone-frais-${r.id}`}
                   type="number"
                   value={draft.fee}
                   onChange={(e) =>

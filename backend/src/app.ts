@@ -68,7 +68,7 @@ export function creerApp({ config, prisma, cache, redis, auth, courrier }: Depen
       "/api/auth/request-password-reset",
       "/api/auth/magic-link/*",
     ],
-    limiter(redis, "auth", { max: 20, fenetreSecondes: 60 }),
+    limiter(redis, "auth", { max: config.AUTH_RATE_MAX, fenetreSecondes: 60 }),
   );
   /**
    * Filtre les demandes de lien magique visant une adresse inconnue.

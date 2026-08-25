@@ -1,0 +1,129 @@
+import { expect, test, type Page } from "@playwright/test";
+import { confirmerAdresse } from "./mailpit.js";
+
+/**
+ * Chaque module du back-office enregistre-t-il réellement ?
+ *
+ * Écrit après un ajout de quartier qui affichait « Quartier ajouté » sans rien
+ * enregistrer. Le principe est le même partout : on modifie depuis l'administration,
+ * on recharge, et on vérifie que le changement a survécu — c'est la seule preuve que
+ * l'écriture a atteint la base plutôt que le seul état de la page.
+ */
+const marque = Date.now();
+
+async function ouvrirBackOffice(page: Page, nom: string): Promise<void> {
+  const adresse = `admin-${nom}-${marque}@decorek.sn`;
+
+  await page.goto("/compte");
+  await page.getByRole("button", { name: "Créer un compte" }).click();
+  await page.getByLabel("Nom complet").fill("Responsable");
+  await page.getByLabel("Email").fill(adresse);
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await confirmerAdresse(page, adresse);
+
+  const { execFileSync } = await import("node:child_process");
+  execFileSync("npm", ["run", "--prefix", "backend", "db:admin", "--", adresse], {
+    cwd: new URL("..", import.meta.url).pathname,
+    stdio: "pipe",
+    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "" },
+  });
+
+  await page.goto("/admin");
+  await expect(page.getByText("Back-office")).toBeVisible({ timeout: 15_000 });
+}
+
+test("Livraisons : un quartier ajouté est bien enregistré", async ({ page }) => {
+  const quartier = `Sacré-Cœur ${marque}`;
+  await ouvrirBackOffice(page, "livraison");
+  await page.getByRole("button", { name: "Livraisons" }).click();
+
+  // Premier formulaire d'ajout de quartier rencontré.
+  await page.getByLabel("Quartier / ville").first().fill(quartier);
+  await page.getByLabel("Frais (FCFA)").first().fill("2500");
+  await page.getByRole("button", { name: "Ajouter le quartier" }).first().click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  // La preuve se prend côté client, sur une page qui relit la base : sans écriture
+  // réelle, le quartier n'y figure pas.
+  await page.goto("/livraison");
+  await expect(page.getByText(quartier).first()).toBeVisible({ timeout: 15_000 });
+});
+
+test("Catégories : une catégorie ajoutée survit au rechargement", async ({ page }) => {
+  const nom = `Vannerie ${marque}`;
+  await ouvrirBackOffice(page, "categories");
+  await page.getByRole("button", { name: "Catégories" }).click();
+
+  await page.getByRole("button", { name: /Nouvelle catégorie/i }).click();
+  await page.getByLabel("Nom", { exact: true }).fill(nom);
+  await page
+    .getByRole("button", { name: /Enregistrer/ })
+    .first()
+    .click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  await page.reload();
+  await page.getByRole("button", { name: "Catégories" }).click();
+  await expect(page.getByText(nom).first()).toBeVisible({ timeout: 15_000 });
+
+  // La boutique propose la nouvelle catégorie en filtre.
+  await page.goto("/boutique");
+  await expect(page.getByRole("button", { name: nom })).toBeVisible({ timeout: 15_000 });
+});
+
+test("Stocks : une correction de stock est enregistrée", async ({ page }) => {
+  await ouvrirBackOffice(page, "stocks");
+  await page.getByRole("button", { name: "Stocks" }).click();
+
+  // L'onglet trie par stock croissant : viser « le premier champ » ne désignerait plus
+  // le même article après modification. On cible donc la ligne d'un produit nommé.
+  const ligne = page.locator("tr", { hasText: "Chaise royale dorée" });
+  const champStock = ligne.locator("input[type='number']").first();
+  await champStock.fill("77");
+  await champStock.blur();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  await page.reload();
+  await page.getByRole("button", { name: "Stocks" }).click();
+  await expect(
+    page.locator("tr", { hasText: "Chaise royale dorée" }).locator("input[type='number']").first(),
+  ).toHaveValue("77", { timeout: 15_000 });
+});
+
+test("Contenu : le seuil de livraison offerte est enregistré", async ({ page }) => {
+  await ouvrirBackOffice(page, "contenu");
+  await page.getByRole("button", { name: "Contenu" }).click();
+
+  await page.getByLabel("Titre bannière").fill(`Bannière ${marque}`);
+  await page
+    .getByRole("button", { name: /Enregistrer/ })
+    .first()
+    .click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  await page.reload();
+  await page.getByRole("button", { name: "Contenu" }).click();
+  await expect(page.getByLabel("Titre bannière")).toHaveValue(`Bannière ${marque}`, {
+    timeout: 15_000,
+  });
+});
+
+test("Promotions : un code ajouté survit au rechargement", async ({ page }) => {
+  const code = `TEST${marque}`.slice(0, 20);
+  await ouvrirBackOffice(page, "promos");
+  await page.getByRole("button", { name: "Promotions" }).click();
+
+  await page.getByRole("button", { name: "Nouveau code promo" }).click();
+  await page.getByLabel("Code", { exact: true }).fill(code);
+  await page
+    .getByRole("button", { name: /Enregistrer/ })
+    .first()
+    .click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  await page.reload();
+  await page.getByRole("button", { name: "Promotions" }).click();
+  await expect(page.getByText(code.toUpperCase()).first()).toBeVisible({ timeout: 15_000 });
+});

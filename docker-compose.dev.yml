@@ -62,5 +62,8 @@ services:
       # Le front de test tourne sur son propre port. Better Auth vérifie l'origine des
       # requêtes et renvoie 403 si elle ne correspond pas à cette adresse.
       AUTH_URL: http://localhost:${E2E_FRONT_PORT:-8090}
+      # La suite de tests émet beaucoup de connexions depuis une seule adresse.
+      # Le plafond réel reste vérifié par les tests d'API, qui le déclenchent.
+      AUTH_RATE_MAX: 500
     ports:
       - "127.0.0.1:${API_E2E_PORT:-53001}:3000"
