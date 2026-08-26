@@ -73,3 +73,28 @@ test("une API en panne affiche un message et un bouton, jamais une page blanche"
   // L'en-tête et le pied de page restent en place : le site n'a pas disparu.
   await expect(page.locator("footer")).toBeVisible();
 });
+
+test("sur téléphone, les filtres tiennent sur une rangée qui défile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/boutique");
+  await expect(page.getByRole("button", { name: "Art de la table" })).toBeVisible({
+    timeout: 20_000,
+  });
+
+  const rangee = page
+    .locator("div")
+    .filter({ has: page.getByRole("button", { name: "Tout", exact: true }) })
+    .last();
+
+  // Une seule rangée : empilées, les catégories formaient un pavé de plusieurs
+  // centaines de pixels qui repoussait les articles hors de l'écran.
+  const boite = await rangee.boundingBox();
+  expect(boite!.height).toBeLessThan(80);
+
+  // Et la page elle-même ne défile jamais horizontalement : c'est la rangée qui
+  // défile, pas le document.
+  const deborde = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  );
+  expect(deborde, "la page ne doit pas déborder en largeur").toBe(false);
+});

@@ -104,11 +104,19 @@ function Boutique() {
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <p className="label-mono mb-3 text-muted-foreground">Catégorie</p>
-        <div className="flex flex-wrap gap-0 border border-border">
+        {/* Une rangée qui défile sur téléphone, et qui revient à la ligne dès qu'il y a
+            la place. Le cadre unique et le retour à la ligne donnaient un pavé
+            irrégulier sur un écran étroit : les intitulés longs occupaient toute la
+            largeur, les courts se serraient à deux, sans rien pour les séparer.
+            Le débord jusqu'aux bords de l'écran montre qu'il reste des catégories à
+            droite, plutôt que de les laisser deviner. */}
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
           <button
             onClick={() => setCategory(undefined)}
-            className={`label-mono px-4 py-3 transition-colors ${
-              !activeCategory ? "bg-foreground text-background" : "hover:bg-muted"
+            className={`label-mono shrink-0 border px-4 py-3 whitespace-nowrap transition-colors ${
+              !activeCategory
+                ? "border-foreground bg-foreground text-background"
+                : "border-border hover:bg-muted"
             }`}
           >
             Tout
@@ -117,8 +125,10 @@ function Boutique() {
             <button
               key={c.id}
               onClick={() => setCategory(c.slug)}
-              className={`label-mono px-4 py-3 transition-colors ${
-                activeCategory?.id === c.id ? "bg-foreground text-background" : "hover:bg-muted"
+              className={`label-mono shrink-0 border px-4 py-3 whitespace-nowrap transition-colors ${
+                activeCategory?.id === c.id
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border hover:bg-muted"
               }`}
             >
               {c.name}

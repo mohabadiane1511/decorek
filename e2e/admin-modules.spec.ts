@@ -71,6 +71,19 @@ test("Catégories : une catégorie ajoutée survit au rechargement", async ({ pa
   // La boutique propose la nouvelle catégorie en filtre.
   await page.goto("/boutique");
   await expect(page.getByRole("button", { name: nom })).toBeVisible({ timeout: 15_000 });
+
+  // Retirée une fois la preuve faite : sans cela, chaque exécution laisse une
+  // catégorie de plus dans la rangée de filtres, qui finit par ne plus rien montrer
+  // du catalogue réel.
+  await page.goto("/admin");
+  await page.getByRole("button", { name: "Catégories" }).click();
+  // Les catégories sont une liste, non un tableau comme les produits.
+  await page
+    .locator("li", { hasText: nom })
+    .first()
+    .getByRole("button", { name: /Supprimer/i })
+    .click();
+  await expect(page.getByText(nom)).toHaveCount(0, { timeout: 15_000 });
 });
 
 test("Stocks : une correction de stock est enregistrée", async ({ page }) => {
