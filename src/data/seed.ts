@@ -8,6 +8,7 @@ const guirlande = "/images/guirlandeislamique.jpg";
 const housse = "/images/houssecanape.jpg";
 const mural = "/images/muralbambou.jpg";
 const sousAssiettes = "/images/sousassiettes.jpg";
+const serviette = "/images/hero-napkin.jpg";
 
 export const seedCategories: Category[] = [
   {
@@ -82,7 +83,9 @@ export const seedProducts: Product[] = [
     lowStockThreshold: 5,
     description:
       "Lot de six anneaux de serviette en métal doré, feuille de ginkgo finement ciselée. Le détail qui transforme une table dressée.",
-    images: [anneaux],
+    // Deux photos : le jeu de démonstration doit contenir au moins un article
+    // multi-vues, faute de quoi la galerie de la fiche n'est jamais exercée.
+    images: [anneaux, serviette],
     featured: true,
     createdAt: "2026-07-01",
   },

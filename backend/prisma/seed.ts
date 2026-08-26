@@ -58,17 +58,30 @@ export async function semer(databaseUrl: string): Promise<void> {
       categoriesParAncienId.set(c.id, enBase.id);
     }
 
-    // Les références suivent l'ordre du jeu de données, et le compteur repart de là :
-    // sans cela, le premier article créé après un amorçage reprendrait « DR-0001 ».
+    // Références déjà attribuées : le jeu de données ne doit pas réclamer celles-là.
+    // Rejouer l'amorçage sur une base déjà peuplée réattribuerait sinon un code porté
+    // par un autre article, et la contrainte d'unicité ferait tout échouer.
+    const prises = new Set(
+      (await prisma.product.findMany({ select: { sku: true } }))
+        .map((p) => p.sku)
+        .filter((sku): sku is string => sku !== null),
+    );
     let rang = 0;
+    const referenceLibre = (): string => {
+      let candidat: string;
+      do {
+        rang += 1;
+        candidat = `DR-${String(rang).padStart(4, "0")}`;
+      } while (prises.has(candidat));
+      prises.add(candidat);
+      return candidat;
+    };
 
     for (const p of seedProducts) {
       const categoryId = categoriesParAncienId.get(p.categoryId);
       if (!categoryId) throw new Error(`Catégorie inconnue pour le produit ${p.slug}`);
-      rang += 1;
 
       const donnees = {
-        sku: `DR-${String(rang).padStart(4, "0")}`,
         name: p.name,
         categoryId,
         price: p.price,
@@ -79,9 +92,15 @@ export async function semer(databaseUrl: string): Promise<void> {
         featured: p.featured,
         createdAt: new Date(p.createdAt),
       };
+      // La référence n'est posée qu'à la création : un article déjà en base garde la
+      // sienne, qui a pu servir à étiqueter des cartons ou figurer sur un inventaire.
+      const existant = await prisma.product.findUnique({
+        where: { slug: p.slug },
+        select: { id: true, sku: true },
+      });
       const produit = await prisma.product.upsert({
         where: { slug: p.slug },
-        create: { slug: p.slug, ...donnees },
+        create: { slug: p.slug, sku: existant?.sku ?? referenceLibre(), ...donnees },
         update: donnees,
       });
 
@@ -96,10 +115,14 @@ export async function semer(databaseUrl: string): Promise<void> {
       });
     }
 
+    // Le compteur ne recule jamais : le ramener en arrière ferait réattribuer une
+    // référence déjà servie au prochain article créé.
+    const compteur = await prisma.skuCounter.findUnique({ where: { id: 1 } });
+    const atteint = Math.max(rang, compteur?.counter ?? 0);
     await prisma.skuCounter.upsert({
       where: { id: 1 },
-      create: { id: 1, counter: rang },
-      update: { counter: rang },
+      create: { id: 1, counter: atteint },
+      update: { counter: atteint },
     });
 
     for (const r of seedRegions) {

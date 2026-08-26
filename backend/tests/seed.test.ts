@@ -62,6 +62,56 @@ describe("contenu semé", () => {
     }
   });
 
+  it("propose au moins un article à plusieurs photos", async () => {
+    // Sans cela, la galerie de la fiche produit n'est jamais exercée : c'est ainsi
+    // qu'une fiche n'affichant que la première photo est passée inaperçue.
+    const parProduit = await prisma.productImage.groupBy({
+      by: ["productId"],
+      _count: { _all: true },
+    });
+    expect(parProduit.some((p) => p._count._all > 1)).toBe(true);
+  });
+
+  it("attribue une référence distincte à chaque article", async () => {
+    const produits = await prisma.product.findMany({ select: { sku: true } });
+    const references = produits.map((p) => p.sku).filter((sku) => sku !== null);
+    expect(references).toHaveLength(produits.length);
+    expect(new Set(references).size).toBe(references.length);
+  });
+
+  it("respecte les références déjà attribuées quand on le rejoue", async () => {
+    // La migration a numéroté le catalogue par date de création ; le jeu de données
+    // suit l'ordre du fichier. Les deux ne coïncident pas : rejouer l'amorçage
+    // réclamait des références portées par d'autres articles, et la contrainte
+    // d'unicité faisait tout échouer. On reproduit ici ce décalage en intervertissant
+    // deux références.
+    const [un, deux] = await prisma.product.findMany({
+      where: { sku: { not: null } },
+      select: { id: true, sku: true },
+      orderBy: { sku: "asc" },
+      take: 2,
+    });
+    const provisoire = "DR-TEMPORAIRE";
+    await prisma.product.update({ where: { id: un!.id }, data: { sku: provisoire } });
+    await prisma.product.update({ where: { id: deux!.id }, data: { sku: un!.sku } });
+    await prisma.product.update({ where: { id: un!.id }, data: { sku: deux!.sku } });
+
+    const avant = await prisma.product.findMany({
+      select: { slug: true, sku: true },
+      orderBy: { slug: "asc" },
+    });
+
+    await semer(url);
+
+    // Aucune référence ne bouge : elles ont pu servir à étiqueter des cartons ou
+    // figurer sur un inventaire déjà imprimé.
+    const apres = await prisma.product.findMany({
+      select: { slug: true, sku: true },
+      orderBy: { slug: "asc" },
+    });
+    expect(apres).toEqual(avant);
+  }, 120_000);
+
   it("ne duplique rien lorsqu'on le rejoue", async () => {
     const avant = {
       categories: await prisma.category.count(),
