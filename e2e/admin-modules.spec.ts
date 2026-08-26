@@ -187,3 +187,22 @@ test("Commandes : un changement de statut est enregistré", async ({ page }) => 
       .getByLabel("Statut"),
   ).toHaveValue("confirmee", { timeout: 15_000 });
 });
+
+test("le back-office se ferme depuis son en-tête", async ({ page }) => {
+  await ouvrirBackOffice(page, "deconnexion");
+
+  // L'adresse du compte est rappelée : à plusieurs sur le même poste, on doit savoir
+  // sous quel compte on agit avant de fermer.
+  await expect(page.getByText(`admin-deconnexion-${marque}@decorek.sn`)).toBeVisible();
+
+  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 15_000 });
+
+  // La session est réellement fermée : l'écran de connexion prend la place, et
+  // recharger ne rouvre pas le back-office.
+  await expect(page.getByRole("button", { name: /Se connecter/ })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.reload();
+  await expect(page.getByText("Tableau de bord")).toHaveCount(0);
+});

@@ -210,17 +210,23 @@ function Admin() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div>
             <p className="font-display text-lg tracking-tight">Deco'Rek — Back-office</p>
-            <p className="text-xs text-muted-foreground">Données de démonstration</p>
+            {/* Sous quel compte on agit : utile à plusieurs sur le même poste, et
+                avant de se déconnecter. Remplace la mention « données de démonstration »,
+                fausse depuis que tout vient de la base. */}
+            <p className="text-xs text-muted-foreground">{store.user?.email}</p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <button
               onClick={() => {
                 store.resetDemo();
-                toast.success("Données de démo réinitialisées");
+                toast.success("Données rechargées");
               }}
+              // « Réinitialiser » laissait croire à une remise à zéro du catalogue :
+              // le bouton relit simplement ce que contient la base.
+              title="Relire les données depuis le serveur"
               className="label-mono border border-border px-4 py-2 transition-colors hover:bg-muted"
             >
-              Réinitialiser
+              Actualiser
             </button>
             <Link
               to="/"
@@ -228,6 +234,16 @@ function Admin() {
             >
               Voir le site
             </Link>
+            <button
+              onClick={() => {
+                // On reste sur place : l'écran de connexion prend le relais, ce qui
+                // permet de rouvrir une session sans repartir de l'accueil.
+                void enregistrer(() => store.signOut(), "Vous êtes déconnecté");
+              }}
+              className="label-mono border border-border px-4 py-2 transition-colors hover:bg-muted"
+            >
+              Se déconnecter
+            </button>
           </div>
         </div>
         <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-2">
