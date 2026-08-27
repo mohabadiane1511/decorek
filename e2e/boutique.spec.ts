@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Page } from "@playwright/test";
 
 // Ces parcours passent par l'API réelle : ils vérifient le branchement de bout en bout,
 // pas seulement le rendu de composants isolés.
@@ -38,7 +39,7 @@ test("la boutique affiche le catalogue servi par l'API", async ({ page }) => {
 
 test("le filtre par catégorie interroge l'API et restreint la liste", async ({ page }) => {
   await page.goto("/boutique");
-  await page.getByRole("button", { name: "Art de la table" }).click();
+  await page.getByRole("main").getByRole("link", { name: "Art de la table" }).click();
   await expect(page).toHaveURL(/categorie=art-de-la-table/);
   await expect(page.getByRole("heading", { name: "Art de la table" })).toBeVisible();
 
@@ -77,14 +78,11 @@ test("une API en panne affiche un message et un bouton, jamais une page blanche"
 test("sur téléphone, les filtres tiennent sur une rangée qui défile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/boutique");
-  await expect(page.getByRole("button", { name: "Art de la table" })).toBeVisible({
+  await expect(page.getByRole("main").getByRole("link", { name: "Art de la table" })).toBeVisible({
     timeout: 20_000,
   });
 
-  const rangee = page
-    .locator("div")
-    .filter({ has: page.getByRole("button", { name: "Tout", exact: true }) })
-    .last();
+  const rangee = page.getByRole("navigation", { name: "Catégories" });
 
   // Une seule rangée : empilées, les catégories formaient un pavé de plusieurs
   // centaines de pixels qui repoussait les articles hors de l'écran.

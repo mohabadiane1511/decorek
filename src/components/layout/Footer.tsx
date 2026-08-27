@@ -105,6 +105,11 @@ export function Footer() {
               </Link>
             </li>
             <li>
+              <Link to="/confidentialite" className="hover:text-background">
+                Confidentialité
+              </Link>
+            </li>
+            <li>
               <Link to="/admin" className="hover:text-background">
                 Espace administration
               </Link>

@@ -30,6 +30,12 @@ export default defineConfig({
           // ensemble : le premier à atteindre le seuil bloque tout le monde.
           xfwd: true,
         },
+        // Le plan du site est construit par l'API depuis la base, mais doit répondre
+        // à la racine : les moteurs le cherchent à /sitemap.xml, pas sous /api.
+        "/sitemap.xml": {
+          target: `http://localhost:${PORT_API}`,
+          changeOrigin: true,
+        },
         "/media": {
           target: `http://localhost:${PORT_MEDIA}`,
           changeOrigin: true,

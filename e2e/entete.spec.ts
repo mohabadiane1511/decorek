@@ -1,4 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Locator, Page } from "@playwright/test";
 
 /**
  * L'en-tête, vu du téléphone autant que du bureau.

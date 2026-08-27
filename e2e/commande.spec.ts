@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Page } from "@playwright/test";
 import { confirmerAdresse } from "./mailpit.js";
 
 // Parcours d'achat complet, du catalogue à la confirmation, contre l'API réelle.

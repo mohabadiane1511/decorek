@@ -7,25 +7,67 @@ import { GalerieProduit } from "@/components/shop/GalerieProduit";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { SqueletteFicheProduit } from "@/components/shop/Squelettes";
 import { formatFcfa } from "@/lib/format";
+import { ficheProduitJsonLd, SITE, urlAbsolue } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { api, ErreurApi as ErreurApiClient } from "@/lib/api";
 import { useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/produit/$slug")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `Article ${params.slug.replace(/-/g, " ")} | Deco'Rek` },
-      {
-        name: "description",
-        content: "Découvrez cet article Deco'Rek : prix en FCFA, stock et livraison au Sénégal.",
-      },
-      { property: "og:title", content: "Article Deco'Rek" },
-      {
-        property: "og:description",
-        content: "Vaisselle et décoration livrées à Dakar, paiement à la livraison.",
-      },
-    ],
-  }),
+  /**
+   * L'article est chargé avant le rendu, donc présent dans le HTML servi.
+   *
+   * Il arrivait auparavant après coup, dans le navigateur : la page envoyée était une
+   * coquille vide. Or ni les robots des moteurs génératifs ni l'aperçu de WhatsApp
+   * n'exécutent de script — partager un lien produit ne montrait donc ni son nom ni
+   * sa photo, et aucune IA ne pouvait citer un seul article.
+   */
+  loader: async ({ params }) => {
+    try {
+      return await api.produit(params.slug);
+    } catch (erreur) {
+      if (erreur instanceof ErreurApiClient && erreur.statut === 404) throw notFound();
+      throw erreur;
+    }
+  },
+
+  head: ({ loaderData }) => {
+    const produit = loaderData;
+    if (!produit) return {};
+
+    const titre = `${produit.name} — ${formatFcfa(produit.price)} | Deco'Rek`;
+    // La description de l'article plutôt qu'une phrase passe-partout : c'est elle qui
+    // s'affiche sous le lien dans les résultats de recherche.
+    const description = produit.description
+      ? produit.description.slice(0, 300)
+      : `${produit.name} — livraison à Dakar, paiement à la livraison.`;
+    const image = produit.images[0] ? urlAbsolue(produit.images[0]) : undefined;
+    const url = `${SITE}/produit/${produit.slug}`;
+
+    return {
+      meta: [
+        { title: titre },
+        { name: "description", content: description },
+        { property: "og:type", content: "product" },
+        { property: "og:title", content: titre },
+        { property: "og:description", content: description },
+        { property: "og:url", content: url },
+        ...(image ? [{ property: "og:image", content: image }] : []),
+        // Sans dimensions, WhatsApp affiche parfois une vignette minuscule.
+        ...(image ? [{ property: "og:image:alt", content: produit.name }] : []),
+        { property: "product:price:amount", content: String(produit.price) },
+        { property: "product:price:currency", content: "XOF" },
+        {
+          property: "product:availability",
+          content: produit.stock > 0 ? "in stock" : "out of stock",
+        },
+        { name: "twitter:card", content: image ? "summary_large_image" : "summary" },
+        ...(image ? [{ name: "twitter:image", content: image }] : []),
+      ],
+      links: [{ rel: "canonical", href: url }],
+      scripts: [ficheProduitJsonLd(produit)],
+    };
+  },
+
   component: ProductPage,
   notFoundComponent: () => (
     <ShopLayout>
@@ -40,50 +82,16 @@ export const Route = createFileRoute("/produit/$slug")({
 });
 
 function ProductPage() {
-  const { slug } = Route.useParams();
   const { products, categories, addToCart, content } = useStore();
   const [qty, setQty] = useState(1);
 
-  // Interrogation directe par slug, plutôt qu'une recherche dans le catalogue chargé :
-  // celui-ci est plafonné, et un produit au-delà de cette limite passerait pour
-  // inexistant. C'est aussi ce qui évite de conclure à l'absence pendant le chargement.
-  const {
-    data: product,
-    isPending,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: ["produit", slug],
-    queryFn: ({ signal }) => api.produit(slug, signal),
-    retry: (tentatives, erreur) =>
-      // Inutile d'insister sur un produit qui n'existe pas.
-      !(erreur instanceof ErreurApiClient && erreur.statut === 404) && tentatives < 2,
-  });
+  // L'article vient du chargeur de route, exécuté avant le rendu : il est donc déjà
+  // dans le HTML envoyé. Le lire ici depuis une requête différée le ferait disparaître
+  // de la page servie, ce qui est précisément ce qu'on corrige.
+  const product = Route.useLoaderData();
 
-  if (isError && error instanceof ErreurApiClient && error.statut === 404) throw notFound();
-
-  if (isPending) {
-    return (
-      <ShopLayout>
-        <SqueletteFicheProduit />
-      </ShopLayout>
-    );
-  }
-
-  if (isError || !product) {
-    return (
-      <ShopLayout>
-        <div className="py-24 text-center">
-          <p className="text-muted-foreground">
-            {error instanceof Error ? error.message : "Impossible de charger cet article."}
-          </p>
-          <Link to="/boutique" className="btn-square btn-outline mt-6">
-            Retour à la boutique
-          </Link>
-        </div>
-      </ShopLayout>
-    );
-  }
+  // Le chargeur lève déjà « introuvable » et remonte les autres pannes à la limite
+  // d'erreur de la route : arrivé ici, l'article existe.
 
   const category = categories.find((c) => c.id === product.categoryId);
   const related = products

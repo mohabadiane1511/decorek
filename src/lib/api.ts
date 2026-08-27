@@ -17,6 +17,21 @@ import type {
  * même code fonctionne dans les deux cas.
  */
 
+/**
+ * Adresse complète d'un appel, selon l'endroit d'où il part.
+ *
+ * Dans le navigateur, le chemin relatif suffit : le proxy s'occupe du reste. Au rendu
+ * serveur il n'y a pas de page courante à laquelle rattacher « /api/… », et le fetch
+ * échoue. C'est ce qui empêchait les pages d'être rendues avec leur contenu — donc
+ * lisibles par les robots et par les aperçus de partage, qui n'exécutent aucun script.
+ */
+function urlComplete(chemin: string): string {
+  if (typeof window !== "undefined") return chemin;
+  const origine =
+    process.env["API_ORIGINE"] ?? `http://localhost:${process.env["API_PORT"] ?? "53000"}`;
+  return `${origine}${chemin}`;
+}
+
 export class ErreurApi extends Error {
   constructor(
     message: string,
@@ -33,7 +48,7 @@ type CorpsErreur = { error?: { code?: string; message?: string } };
 async function envoyer<T>(chemin: string, corps: unknown): Promise<T> {
   let reponse: Response;
   try {
-    reponse = await fetch(chemin, {
+    reponse = await fetch(urlComplete(chemin), {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(corps),
@@ -87,7 +102,7 @@ async function envoyerMethode<T>(methode: string, chemin: string, corps?: unknow
 
   let reponse: Response;
   try {
-    reponse = await fetch(chemin, options);
+    reponse = await fetch(urlComplete(chemin), options);
   } catch {
     throw new ErreurApi("Impossible de joindre la boutique. Vérifiez votre connexion.", 0);
   }
@@ -115,7 +130,7 @@ async function appeler<T>(chemin: string, signal?: AbortSignal): Promise<T> {
 
   let reponse: Response;
   try {
-    reponse = await fetch(chemin, options);
+    reponse = await fetch(urlComplete(chemin), options);
   } catch {
     // Coupure réseau ou API éteinte : on veut un message lisible, pas un « fetch failed »
     // brut affiché à un client à Dakar.
@@ -242,6 +257,20 @@ export function construireRequete(filtres: FiltresProduits | FiltresAdmin): stri
 }
 
 export const api = {
+  /**
+   * Tout ce qu'il faut pour dessiner une page, en un appel.
+   *
+   * Le rendu serveur réclamait catalogue, catégories, contenu et livraison séparément :
+   * quatre allers-retours avant de pouvoir répondre, à chaque page.
+   */
+  amorce: (signal?: AbortSignal) =>
+    appeler<{
+      products: Product[];
+      categories: Category[];
+      content: SiteContent;
+      regions: DeliveryRegion[];
+    }>("/api/amorce", signal),
+
   produits: (filtres: FiltresProduits = {}, signal?: AbortSignal) =>
     appeler<PageProduits>(`/api/produits${construireRequete(filtres)}`, signal),
 

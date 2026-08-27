@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 /**
  * Contrôle de fumée : chaque page publique s'affiche sans erreur JavaScript.

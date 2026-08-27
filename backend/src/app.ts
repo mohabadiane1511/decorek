@@ -16,6 +16,7 @@ import { routesAdmin } from "./routes/admin.js";
 import { routesCatalogue } from "./routes/catalogue.js";
 import { routesCommandes } from "./routes/commandes.js";
 import { routesCompte } from "./routes/compte.js";
+import { routesSitemap } from "./routes/sitemap.js";
 import { routesContenu } from "./routes/contenu.js";
 import { routesSuivi } from "./routes/suivi.js";
 
@@ -120,6 +121,9 @@ export function creerApp({ config, prisma, cache, redis, auth, courrier }: Depen
   app.route("/api", routesContenu(prisma, cache));
   app.route("/api", routesCommandes(prisma, cache, auth, courrier, config));
   app.route("/api", routesCompte(prisma, auth));
+  // Servi à la racine par le proxy : un plan de site doit vivre à /sitemap.xml,
+  // pas sous /api, sinon les moteurs ne le cherchent pas là où il est.
+  app.route("/", routesSitemap(prisma, config.SITE_URL));
   app.route("/api", routesSuivi(prisma, auth, redis));
   app.route("/api", routesAdmin(prisma, cache, auth, config));
 

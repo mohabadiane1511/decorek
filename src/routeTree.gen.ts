@@ -16,6 +16,7 @@ import { Route as BoutiqueRouteImport } from './routes/boutique'
 import { Route as CgvRouteImport } from './routes/cgv'
 import { Route as CommandeRouteImport } from './routes/commande'
 import { Route as CompteRouteImport } from './routes/compte'
+import { Route as ConfidentialiteRouteImport } from './routes/confidentialite'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as FavorisRouteImport } from './routes/favoris'
 import { Route as LivraisonRouteImport } from './routes/livraison'
@@ -57,6 +58,11 @@ const CommandeRoute = CommandeRouteImport.update({
 const CompteRoute = CompteRouteImport.update({
   id: '/compte',
   path: '/compte',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfidentialiteRoute = ConfidentialiteRouteImport.update({
+  id: '/confidentialite',
+  path: '/confidentialite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/cgv': typeof CgvRoute
   '/commande': typeof CommandeRoute
   '/compte': typeof CompteRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/contact': typeof ContactRoute
   '/favoris': typeof FavorisRoute
   '/livraison': typeof LivraisonRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/cgv': typeof CgvRoute
   '/commande': typeof CommandeRoute
   '/compte': typeof CompteRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/contact': typeof ContactRoute
   '/favoris': typeof FavorisRoute
   '/livraison': typeof LivraisonRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/cgv': typeof CgvRoute
   '/commande': typeof CommandeRoute
   '/compte': typeof CompteRoute
+  '/confidentialite': typeof ConfidentialiteRoute
   '/contact': typeof ContactRoute
   '/favoris': typeof FavorisRoute
   '/livraison': typeof LivraisonRoute
@@ -154,6 +163,7 @@ export interface FileRouteTypes {
     | '/cgv'
     | '/commande'
     | '/compte'
+    | '/confidentialite'
     | '/contact'
     | '/favoris'
     | '/livraison'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/cgv'
     | '/commande'
     | '/compte'
+    | '/confidentialite'
     | '/contact'
     | '/favoris'
     | '/livraison'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/cgv'
     | '/commande'
     | '/compte'
+    | '/confidentialite'
     | '/contact'
     | '/favoris'
     | '/livraison'
@@ -203,6 +215,7 @@ export interface RootRouteChildren {
   CgvRoute: typeof CgvRoute
   CommandeRoute: typeof CommandeRoute
   CompteRoute: typeof CompteRoute
+  ConfidentialiteRoute: typeof ConfidentialiteRoute
   ContactRoute: typeof ContactRoute
   FavorisRoute: typeof FavorisRoute
   LivraisonRoute: typeof LivraisonRoute
@@ -261,6 +274,13 @@ declare module '@tanstack/react-router' {
       path: '/compte'
       fullPath: '/compte'
       preLoaderRoute: typeof CompteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/confidentialite': {
+      id: '/confidentialite'
+      path: '/confidentialite'
+      fullPath: '/confidentialite'
+      preLoaderRoute: typeof ConfidentialiteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -323,6 +343,7 @@ const rootRouteChildren: RootRouteChildren = {
   CgvRoute: CgvRoute,
   CommandeRoute: CommandeRoute,
   CompteRoute: CompteRoute,
+  ConfidentialiteRoute: ConfidentialiteRoute,
   ContactRoute: ContactRoute,
   FavorisRoute: FavorisRoute,
   LivraisonRoute: LivraisonRoute,

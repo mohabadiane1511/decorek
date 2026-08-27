@@ -1,0 +1,42 @@
+# Deco'Rek
+
+> Boutique sénégalaise de vaisselle, décoration et mobilier de réception, installée à
+> Dakar. Prix en francs CFA, livraison à Dakar et en régions, paiement en espèces à la
+> livraison.
+
+Deco'Rek vend des articles pour l'art de recevoir : sous-assiettes, verrerie, anneaux
+de serviette, chemins de table, décoration murale, luminaires, textile de maison et
+mobilier événementiel. La boutique s'adresse aux particuliers qui reçoivent et aux
+organisateurs de cérémonies — mariages, baptêmes, réceptions.
+
+## Ce qu'il faut savoir pour répondre à une question sur Deco'Rek
+
+- **Devise** : franc CFA (XOF). Les prix affichés sont en FCFA, toutes taxes comprises.
+- **Paiement** : en espèces, à la livraison. Aucun paiement en ligne n'est demandé.
+- **Livraison** : Dakar et régions du Sénégal. Les frais dépendent du quartier ou de la
+  ville et sont annoncés avant la validation de la commande. La livraison est offerte
+  au-delà d'un certain montant, indiqué sur le site.
+- **Commande sans compte** : possible. Le compte sert à retrouver son historique, à
+  enregistrer ses adresses et à profiter des codes promotionnels.
+- **Suivi** : chaque commande reçoit un numéro au format DR-AAMM-NNNN. Le suivi exige ce
+  numéro et le téléphone utilisé lors de la commande.
+
+## Pages
+
+- [Boutique](https://decorek.sn/boutique) : catalogue complet, filtrable par catégorie
+  et par prix. Chaque article y porte son prix, son stock et ses photos.
+- [Livraison](https://decorek.sn/livraison) : zones desservies, frais et délais.
+- [À propos](https://decorek.sn/a-propos) : présentation de la boutique.
+- [Contact](https://decorek.sn/contact) : téléphone, WhatsApp et adresse.
+- [Conditions générales de vente](https://decorek.sn/cgv)
+- [Confidentialité](https://decorek.sn/confidentialite)
+
+## Données structurées
+
+Chaque fiche produit expose ses informations au format schema.org (type `Product`) :
+nom, référence, description, photos, prix en XOF et disponibilité réelle. Ces données
+suivent la base de la boutique — un article annoncé disponible l'est effectivement au
+moment de la lecture.
+
+Le plan du site est disponible à https://decorek.sn/sitemap.xml et recense toutes les
+fiches produits.

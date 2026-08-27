@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Page } from "@playwright/test";
 
 const TELEPHONE = "+221 77 123 45 67";
 

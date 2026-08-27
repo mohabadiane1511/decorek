@@ -54,40 +54,49 @@ export function versContenu(c: ContenuEnBase): SiteContent {
   };
 }
 
+/**
+ * Contenu éditorial du site.
+ *
+ * Extrait de sa route pour que l'amorçage d'une page puisse le réclamer sans passer
+ * par un second appel HTTP — le rendu serveur en avait besoin quatre.
+ */
+export async function chargerContenu(prisma: PrismaClient, cache: Cache): Promise<SiteContent> {
+  const contenu = await cache.lireOuCharger("contenu", TTL_CONTENU, () =>
+    prisma.siteContent.findUnique({ where: { id: 1 } }),
+  );
+  if (!contenu) {
+    // Échouer bruyamment plutôt que servir des valeurs par défaut : sans ce contenu,
+    // le site afficherait un numéro WhatsApp vide et une livraison offerte à partir
+    // de 0 FCFA. Mieux vaut une erreur visible qu'une promesse commerciale fausse.
+    throw new ErreurApi("ERREUR_INTERNE", "Contenu du site absent : exécuter `npm run db:seed`.");
+  }
+  return versContenu(contenu);
+}
+
+/** Zones de livraison et leurs frais. */
+export async function chargerLivraison(
+  prisma: PrismaClient,
+  cache: Cache,
+): Promise<DeliveryRegion[]> {
+  return cache.lireOuCharger<DeliveryRegion[]>("livraison", TTL_CONTENU, async () => {
+    const regions = await prisma.deliveryRegion.findMany({
+      orderBy: { name: "asc" },
+      include: { areas: { orderBy: { name: "asc" } } },
+    });
+    return regions.map((r) => ({
+      id: r.id,
+      name: r.name,
+      areas: r.areas.map((a) => ({ id: a.id, name: a.name, fee: a.fee })),
+    }));
+  });
+}
+
 export function routesContenu(prisma: PrismaClient, cache: Cache): Hono {
   const routes = new Hono();
 
-  routes.get("/contenu", async (c) => {
-    const contenu = await cache.lireOuCharger("contenu", TTL_CONTENU, () =>
-      prisma.siteContent.findUnique({ where: { id: 1 } }),
-    );
-    if (!contenu) {
-      // Échouer bruyamment plutôt que servir des valeurs par défaut : sans ce contenu,
-      // le site afficherait un numéro WhatsApp vide et une livraison offerte à partir
-      // de 0 FCFA. Mieux vaut une erreur visible qu'une promesse commerciale fausse.
-      throw new ErreurApi("ERREUR_INTERNE", "Contenu du site absent : exécuter `npm run db:seed`.");
-    }
-    return c.json(versContenu(contenu));
-  });
+  routes.get("/contenu", async (c) => c.json(await chargerContenu(prisma, cache)));
 
-  routes.get("/livraison", async (c) => {
-    const items = await cache.lireOuCharger<DeliveryRegion[]>(
-      "livraison",
-      TTL_CONTENU,
-      async () => {
-        const regions = await prisma.deliveryRegion.findMany({
-          orderBy: { name: "asc" },
-          include: { areas: { orderBy: { name: "asc" } } },
-        });
-        return regions.map((r) => ({
-          id: r.id,
-          name: r.name,
-          areas: r.areas.map((a) => ({ id: a.id, name: a.name, fee: a.fee })),
-        }));
-      },
-    );
-    return c.json({ items });
-  });
+  routes.get("/livraison", async (c) => c.json({ items: await chargerLivraison(prisma, cache) }));
 
   return routes;
 }

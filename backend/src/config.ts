@@ -11,6 +11,9 @@ const schemaConfig = z.object({
   // 32 caractères au minimum, générés aléatoirement (openssl rand -base64 32).
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET doit faire au moins 32 caractères"),
   AUTH_URL: z.string().min(1).default("http://localhost:8080"),
+  // Adresse publique du site, utilisée par le plan du site et les liens des
+  // e-mails. Distincte de AUTH_URL, qui désigne l'API.
+  SITE_URL: z.string().min(1).default("https://decorek.sn"),
   // Tentatives de connexion tolérées par minute et par adresse IP. Relevé uniquement
   // pour l'instance dédiée aux tests, qui en émet beaucoup depuis une seule adresse ;
   // la valeur de production reste celle par défaut.

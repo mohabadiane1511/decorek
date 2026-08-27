@@ -104,9 +104,30 @@ type StoreValue = State & {
 
 const StoreContext = createContext<StoreValue | null>(null);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<State>(initialState);
-  const [ready, setReady] = useState(false);
+/** Ce que le chargeur de route a déjà obtenu du serveur, s'il y est parvenu. */
+export type DonneesInitiales = {
+  products: Product[];
+  categories: Category[];
+  content: SiteContent;
+  regions: DeliveryRegion[];
+} | null;
+
+export function StoreProvider({
+  children,
+  donneesInitiales = null,
+}: {
+  children: ReactNode;
+  donneesInitiales?: DonneesInitiales;
+}) {
+  // Les données publiques arrivent du rendu serveur quand il a pu les obtenir : la page
+  // est alors complète dès le premier octet, et non après un aller-retour depuis le
+  // navigateur. C'est ce qui la rend lisible aux robots et aux aperçus de partage.
+  const [state, setState] = useState<State>(() =>
+    donneesInitiales ? { ...initialState, ...donneesInitiales } : initialState,
+  );
+  // Prête d'emblée si le serveur a fourni le catalogue : sans cela l'écran d'attente
+  // recouvrirait un contenu déjà présent.
+  const [ready, setReady] = useState(donneesInitiales !== null);
   const [erreurChargement, setErreurChargement] = useState<string | null>(null);
   const [rechargement, setRechargement] = useState(0);
 

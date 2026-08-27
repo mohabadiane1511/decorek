@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Page } from "@playwright/test";
 import { attendreMessage, confirmerAdresse, extraireLien } from "./mailpit.js";
 
 // Comptes distincts par exécution : les tests créent de vrais utilisateurs en base.

@@ -5,6 +5,7 @@ import type { Category, Product } from "../../../src/data/types.js";
 import type { Cache } from "../cache.js";
 import { ErreurApi, corpsErreur } from "../erreurs.js";
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { chargerContenu, chargerLivraison } from "./contenu.js";
 
 // Produit tel qu'il sort de la base, images comprises.
 type ProduitEnBase = {
@@ -46,6 +47,48 @@ export function versProduit(p: ProduitEnBase): Product {
     featured: p.featured,
     createdAt: p.createdAt.toISOString(),
   };
+}
+
+/**
+ * Première page du catalogue, sans filtre.
+ *
+ * Reprend la clé de cache de la route publique : les deux chemins partagent donc la
+ * même entrée, et une invalidation les périme ensemble.
+ */
+export async function chargerPageCatalogue(
+  prisma: PrismaClient,
+  cache: Cache,
+  parPage: number,
+): Promise<{ items: Product[]; total: number; page: number; pages: number }> {
+  return cache.lireOuCharger(`produits:::recent:1:${parPage}`, TTL_CATALOGUE, async () => {
+    const [total, produits] = await prisma.$transaction([
+      prisma.product.count(),
+      prisma.product.findMany({
+        orderBy: { createdAt: "desc" },
+        include: inclureImages,
+        take: parPage,
+      }),
+    ]);
+    return {
+      items: produits.map(versProduit),
+      total,
+      page: 1,
+      pages: Math.max(1, Math.ceil(total / parPage)),
+    };
+  });
+}
+
+/** Catégories du catalogue, partagées par leur route et par l'amorçage d'une page. */
+export async function chargerCategories(prisma: PrismaClient, cache: Cache): Promise<Category[]> {
+  return cache.lireOuCharger<Category[]>("categories", TTL_CATALOGUE, async () => {
+    const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
+    return categories.map((cat) => ({
+      id: cat.id,
+      slug: cat.slug,
+      name: cat.name,
+      description: cat.description,
+    }));
+  });
 }
 
 const TRIS = ["recent", "prix-asc", "prix-desc"] as const;
@@ -138,17 +181,24 @@ export function routesCatalogue(prisma: PrismaClient, cache: Cache): Hono {
     return c.json(versProduit({ ...produit, createdAt: new Date(produit.createdAt) }));
   });
 
-  routes.get("/categories", async (c) => {
-    const items = await cache.lireOuCharger<Category[]>("categories", TTL_CATALOGUE, async () => {
-      const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
-      return categories.map((cat) => ({
-        id: cat.id,
-        slug: cat.slug,
-        name: cat.name,
-        description: cat.description,
-      }));
-    });
-    return c.json({ items });
+  routes.get("/categories", async (c) => c.json({ items: await chargerCategories(prisma, cache) }));
+
+  /**
+   * Tout ce qu'il faut pour dessiner une page, en un seul appel.
+   *
+   * Le rendu serveur réclamait catalogue, catégories, contenu et zones de livraison
+   * séparément : quatre allers-retours avant de pouvoir répondre, à chaque page. Ils
+   * puisent aux mêmes caches que les routes individuelles, qui restent en place pour
+   * qui n'a besoin que d'une partie.
+   */
+  routes.get("/amorce", async (c) => {
+    const [catalogue, categories, contenu, regions] = await Promise.all([
+      chargerPageCatalogue(prisma, cache, 48),
+      chargerCategories(prisma, cache),
+      chargerContenu(prisma, cache),
+      chargerLivraison(prisma, cache),
+    ]);
+    return c.json({ products: catalogue.items, categories, content: contenu, regions });
   });
 
   return routes;

@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "@/lib/store";
+import { api } from "@/lib/api";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -97,6 +98,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", type: "image/png", href: "/favicon.png" },
     ],
   }),
+  /**
+   * Données publiques chargées avant le rendu, donc présentes dans le HTML servi.
+   *
+   * Elles arrivaient auparavant depuis le navigateur, et la mise en page masquait tout
+   * le contenu en attendant : ce que recevait un robot — ou l'aperçu WhatsApp, qui
+   * n'exécute aucun script — était un écran d'attente.
+   *
+   * Une panne ici ne doit pas empêcher la page de s'afficher : le navigateur reprendra
+   * le chargement, et l'écran « boutique indisponible » lui appartient.
+   */
+  loader: async () => {
+    try {
+      return await api.amorce();
+    } catch {
+      return null;
+    }
+  },
+
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -119,10 +138,19 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const donnees = Route.useLoaderData();
+
+  // Marque la page comme interactive. Le contenu étant rendu par le serveur, il
+  // s'affiche avant que le script ne soit prêt : un clic émis dans cet intervalle est
+  // perdu. Ce repère permet de savoir quand l'interface répond réellement — les tests
+  // s'en servent, et il aide à diagnostiquer une hydratation qui échoue.
+  useEffect(() => {
+    document.documentElement.dataset["pret"] = "1";
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
+      <StoreProvider donneesInitiales={donnees}>
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
         <Toaster position="top-center" />

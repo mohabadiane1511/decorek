@@ -77,7 +77,6 @@ function Commande() {
     const habituelle = adresses.find((a) => a.isDefault && a.areaId);
     if (habituelle) utiliserAdresse(habituelle);
     setAdressePrise(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adresses, regions, adressePrise]);
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");

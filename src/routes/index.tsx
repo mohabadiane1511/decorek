@@ -4,8 +4,8 @@ import { ShopLayout } from "@/components/layout/ShopLayout";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { useStore } from "@/lib/store";
 import { SITE_URL } from "@/lib/site";
-
-const heroBg = "/images/hero-napkin.jpg";
+import { IMAGE_ACCUEIL } from "@/lib/images";
+import { boutiqueJsonLd } from "@/lib/seo";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,10 +21,15 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "L'art de recevoir, version sénégalaise. Paiement à la livraison.",
       },
-      { property: "og:image", content: `${SITE_URL}${heroBg}` },
-      { name: "twitter:image", content: `${SITE_URL}${heroBg}` },
+      { property: "og:image", content: `${SITE_URL}${IMAGE_ACCUEIL}` },
+      { property: "og:url", content: SITE_URL },
+      { name: "twitter:image", content: `${SITE_URL}${IMAGE_ACCUEIL}` },
       { name: "twitter:card", content: "summary_large_image" },
     ],
+    links: [{ rel: "canonical", href: SITE_URL }],
+    // L'identité de la boutique, en clair : ville, pays, devise et mode de paiement.
+    // C'est ce qu'un moteur reprend pour répondre « où acheter à Dakar ».
+    scripts: [boutiqueJsonLd()],
   }),
   component: Index,
 });
@@ -44,7 +49,7 @@ function Index() {
         {/* Image de fond + voile */}
         <div className="hero-bg absolute inset-0">
           <img
-            src={heroBg}
+            src={IMAGE_ACCUEIL}
             alt="Art de la table — Maison Deco'Rek"
             className="h-full w-full scale-105 object-cover object-center blur-[2px]"
           />

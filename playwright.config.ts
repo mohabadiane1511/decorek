@@ -9,6 +9,11 @@ export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/setup-global.ts",
   fullyParallel: true,
+  // Plafonné depuis que les pages sont rendues par le serveur : chaque navigation lui
+  // coûte désormais un appel à l'API, en plus de la compilation à la demande du serveur
+  // de développement. Sans cette limite, des tests échouaient au hasard sous la charge —
+  // un signal trompeur, puisque le site lui-même n'était pas en cause.
+  workers: process.env["CI"] ? 2 : 3,
   forbidOnly: !!process.env["CI"],
   retries: process.env["CI"] ? 2 : 0,
   reporter: process.env["CI"] ? "github" : "list",

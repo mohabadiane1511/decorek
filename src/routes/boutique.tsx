@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ShopLayout, PageHeader } from "@/components/layout/ShopLayout";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { api, type FiltresProduits } from "@/lib/api";
 import { formatFcfa } from "@/lib/format";
+import { filAriane, SITE } from "@/lib/seo";
 import { useStore } from "@/lib/store";
 import { useDebounce } from "@/lib/useDebounce";
 
@@ -31,6 +32,16 @@ export const Route = createFileRoute("/boutique")({
         property: "og:description",
         content: "Catalogue complet de vaisselle et décoration, livré à Dakar et en régions.",
       },
+      { property: "og:url", content: `${SITE}/boutique` },
+    ],
+    // Le canonique ignore les filtres : « ?categorie=… » et « ?page=2 » décrivent des
+    // vues d'un même catalogue, et les indexer séparément les ferait se concurrencer.
+    links: [{ rel: "canonical", href: `${SITE}/boutique` }],
+    scripts: [
+      filAriane([
+        { nom: "Accueil", chemin: "/" },
+        { nom: "Boutique", chemin: "/boutique" },
+      ]),
     ],
   }),
   component: Boutique,
@@ -81,11 +92,6 @@ function Boutique() {
     if (data && page > data.pages) setPage(data.pages);
   }, [data, page]);
 
-  const setCategory = (slug?: string) => {
-    setPage(1);
-    void navigate({ search: (prev: Search) => ({ ...prev, categorie: slug }) });
-  };
-
   const total = data?.total ?? 0;
   const pages = data?.pages ?? 1;
 
@@ -110,9 +116,16 @@ function Boutique() {
             largeur, les courts se serraient à deux, sans rien pour les séparer.
             Le débord jusqu'aux bords de l'écran montre qu'il reste des catégories à
             droite, plutôt que de les laisser deviner. */}
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-          <button
-            onClick={() => setCategory(undefined)}
+        <nav
+          aria-label="Catégories"
+          className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+        >
+          {/* De vrais liens, non des boutons : ils mènent quelque part avant même que
+              le script soit prêt — ce qui compte sur une connexion lente — et un moteur
+              peut les suivre pour découvrir chaque catégorie. */}
+          <Link
+            to="/boutique"
+            search={(prev: Search) => ({ ...prev, categorie: undefined, page: undefined })}
             className={`label-mono shrink-0 border px-4 py-3 whitespace-nowrap transition-colors ${
               !activeCategory
                 ? "border-foreground bg-foreground text-background"
@@ -120,11 +133,12 @@ function Boutique() {
             }`}
           >
             Tout
-          </button>
+          </Link>
           {categories.map((c) => (
-            <button
+            <Link
               key={c.id}
-              onClick={() => setCategory(c.slug)}
+              to="/boutique"
+              search={(prev: Search) => ({ ...prev, categorie: c.slug, page: undefined })}
               className={`label-mono shrink-0 border px-4 py-3 whitespace-nowrap transition-colors ${
                 activeCategory?.id === c.id
                   ? "border-foreground bg-foreground text-background"
@@ -132,9 +146,9 @@ function Boutique() {
               }`}
             >
               {c.name}
-            </button>
+            </Link>
           ))}
-        </div>
+        </nav>
 
         <div className="mt-6 grid gap-4 border-y border-border py-5 sm:grid-cols-[1fr_auto_auto] sm:items-center">
           <Input

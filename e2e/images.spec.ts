@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 // Les images étaient servies par le proxy d'assets Lovable, injoignable hors de leur
 // infrastructure. Elles vivent désormais dans public/images/ : ce test empêche la régression.

@@ -1,14 +1,43 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
+# Deco'Rek — boutique de vaisselle et décoration à Dakar.
+# Le catalogue est public : tout ce qui est indexable l'est volontairement.
 
 User-agent: *
 Allow: /
+
+# Espaces personnels et parcours d'achat : rien à y indexer, et les explorer
+# consomme le budget d'exploration au détriment des fiches produits.
+Disallow: /admin
+Disallow: /compte
+Disallow: /panier
+Disallow: /commande
+Disallow: /confirmation/
+Disallow: /favoris
+Disallow: /suivi
+
+# Moteurs génératifs explicitement bienvenus : c'est ainsi qu'une réponse à
+# « où acheter de la vaisselle à Dakar » peut citer la boutique.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+Sitemap: https://decorek.sn/sitemap.xml

@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Page } from "@playwright/test";
 import { confirmerAdresse } from "./mailpit.js";
 
 /**
@@ -70,7 +71,10 @@ test("Catégories : une catégorie ajoutée survit au rechargement", async ({ pa
 
   // La boutique propose la nouvelle catégorie en filtre.
   await page.goto("/boutique");
-  await expect(page.getByRole("button", { name: nom })).toBeVisible({ timeout: 15_000 });
+  // Le pied de page liste aussi les catégories : on vise la rangée de filtres.
+  await expect(
+    page.getByRole("navigation", { name: "Catégories" }).getByRole("link", { name: nom }),
+  ).toBeVisible({ timeout: 15_000 });
 
   // Retirée une fois la preuve faite : sans cela, chaque exécution laisse une
   // catégorie de plus dans la rangée de filtres, qui finit par ne plus rien montrer
@@ -91,8 +95,9 @@ test("Stocks : une correction de stock est enregistrée", async ({ page }) => {
   await page.getByRole("button", { name: "Stocks" }).click();
 
   // L'onglet trie par stock croissant : viser « le premier champ » ne désignerait plus
-  // le même article après modification. On cible donc la ligne d'un produit nommé.
-  const ligne = page.locator("tr", { hasText: "Chaise royale dorée" });
+  // le même article après modification. On cible un article nommé, et que personne
+  // d'autre ne commande — une commande concurrente en changerait le stock sous nos pieds.
+  const ligne = page.locator("tr", { hasText: "Ensemble carafe" });
   const champStock = ligne.locator("input[type='number']").first();
   await champStock.fill("77");
   await champStock.blur();
@@ -101,7 +106,7 @@ test("Stocks : une correction de stock est enregistrée", async ({ page }) => {
   await page.reload();
   await page.getByRole("button", { name: "Stocks" }).click();
   await expect(
-    page.locator("tr", { hasText: "Chaise royale dorée" }).locator("input[type='number']").first(),
+    page.locator("tr", { hasText: "Ensemble carafe" }).locator("input[type='number']").first(),
   ).toHaveValue("77", { timeout: 15_000 });
 });
 
