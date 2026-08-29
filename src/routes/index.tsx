@@ -76,7 +76,7 @@ function Index() {
       <div className="border-b border-border bg-accent">
         <div className="mx-auto grid max-w-7xl grid-cols-2 divide-x divide-white/15 md:grid-cols-4">
           {[
-            "Paiement à la réception",
+            "Wave & Orange Money",
             "Livraison régions",
             "Vaisselle & décoration",
             "Conseil WhatsApp",

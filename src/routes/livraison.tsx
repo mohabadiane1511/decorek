@@ -6,7 +6,7 @@ import { useStore } from "@/lib/store";
 export const Route = createFileRoute("/livraison")({
   head: () => ({
     meta: [
-      { title: "Livraison & paiement à la réception | Deco'Rek" },
+      { title: "Livraison & paiement | Deco'Rek" },
       {
         name: "description",
         content:

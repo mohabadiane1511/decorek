@@ -37,6 +37,23 @@ test("la confirmation donne le numéro à créditer et le montant exact", async 
   await expect(page.getByText(numero).first()).toBeVisible();
 });
 
+test("le numéro, le montant et la référence se copient", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const numero = await commander(page, "Wave");
+
+  await page.getByRole("button", { name: "Copier : Numéro à créditer" }).click();
+  await expect(page.getByRole("button", { name: /Copier : Numéro/ })).toContainText("Copié");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("+221 77 000 11 22");
+
+  // Le montant part en chiffres nus : « 13 000 FCFA » serait refusé par l'application
+  // de paiement, où l'on saisit un nombre.
+  await page.getByRole("button", { name: "Copier : Montant exact" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\d+$/);
+
+  await page.getByRole("button", { name: "Copier : À indiquer en libellé" }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(numero);
+});
+
 test("le bouton WhatsApp porte toute la commande dans son message", async ({ page }) => {
   const numero = await commander(page, "Orange Money");
 
@@ -164,10 +181,14 @@ test("les numéros de paiement se règlent depuis le back-office", async ({ page
 test("le site n'annonce plus le paiement à la livraison", async ({ request }) => {
   // Promettre un règlement à réception alors qu'on le demande d'avance ferait perdre
   // la commande au moment de payer.
-  for (const chemin of ["/", "/boutique", "/livraison", "/cgv", "/llms.txt"]) {
+  // « à la réception » compte autant que « à la livraison » : c'est la même promesse,
+  // et c'est cette seconde formulation qui avait échappé au premier passage.
+  const interdits = [/paiement (uniquement )?à la livraison/i, /à la réception/i, /vous réglerez/i];
+
+  for (const chemin of ["/", "/boutique", "/livraison", "/cgv", "/commande", "/llms.txt"]) {
     const contenu = await (await request.get(chemin)).text();
-    expect(contenu, `${chemin} annonce encore le paiement à la livraison`).not.toMatch(
-      /paiement (uniquement )?à la livraison/i,
-    );
+    for (const interdit of interdits) {
+      expect(contenu, `${chemin} annonce encore un règlement à réception`).not.toMatch(interdit);
+    }
   }
 });

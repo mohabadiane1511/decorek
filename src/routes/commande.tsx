@@ -19,7 +19,7 @@ export const Route = createFileRoute("/commande")({
       {
         name: "description",
         content:
-          "Renseignez vos coordonnées de livraison. Commande validée à la soumission, paiement à la réception.",
+          "Renseignez vos coordonnées de livraison. Règlement par Wave ou Orange Money avant expédition.",
       },
       { property: "og:title", content: "Finaliser ma commande — Deco'Rek" },
       {
@@ -180,7 +180,7 @@ function Commande() {
     <ShopLayout>
       <PageHeader
         title="Finaliser la commande"
-        intro="Commande validée dès la soumission. Vous payez à la réception, après vérification du colis."
+        intro="Réglez par Wave ou Orange Money après validation : votre colis part dès que nous avons vérifié le paiement."
       />
       <form
         onSubmit={(e) => void submit(e)}

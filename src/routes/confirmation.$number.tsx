@@ -5,6 +5,7 @@ import { RecapMontants } from "@/components/shop/RecapMontants";
 import { formatFcfa, formatDate } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { useState } from "react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { LIBELLES_PAIEMENT, lienPreuvePaiement, numeroDePaiement } from "@/lib/paiement";
 import type { Order } from "@/data/types";
@@ -36,9 +37,13 @@ function Confirmation() {
         <CheckCircle2 className="mx-auto h-12 w-12 text-orange-brand" strokeWidth={1.25} />
         <h1 className="mt-6 title-lg">Merci, votre commande est validée</h1>
         <p className="mt-3 text-muted-foreground">
-          Commande <span className="text-foreground">{number}</span>. Notre équipe vous appelle pour
-          confirmer la livraison. Vous réglerez à la réception.
+          Commande <span className="text-foreground">{number}</span>. Il reste une étape : régler le
+          montant ci-dessous, puis nous envoyer votre reçu.
         </p>
+
+        {/* Placé avant le récapitulatif : c'est ce que la cliente doit faire maintenant.
+            Sous le détail de sa commande, il fallait faire défiler pour le découvrir. */}
+        {order && <ReglerCommande order={order} />}
 
         {order && (
           <div className="mt-10 border border-border p-6 text-left text-sm">
@@ -73,8 +78,6 @@ function Confirmation() {
             </p>
           </div>
         )}
-
-        {order && <ReglerCommande order={order} />}
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link to="/suivi" className="btn-square btn-solid">
@@ -117,18 +120,17 @@ function ReglerCommande({ order }: { order: Order }) {
 
       {numero ? (
         <dl className="mt-5 space-y-3 text-sm">
-          <div className="flex flex-wrap justify-between gap-2">
-            <dt className="text-muted-foreground">Numéro à créditer</dt>
-            <dd className="font-mono text-base">{numero}</dd>
-          </div>
-          <div className="flex flex-wrap justify-between gap-2">
-            <dt className="text-muted-foreground">Montant exact</dt>
-            <dd className="font-mono text-base">{formatFcfa(order.total)}</dd>
-          </div>
-          <div className="flex flex-wrap justify-between gap-2">
-            <dt className="text-muted-foreground">À indiquer en libellé</dt>
-            <dd className="font-mono text-base">{order.number}</dd>
-          </div>
+          {/* Les trois valeurs se recopient dans l'application de paiement : les rendre
+              copiables évite une saisie à la main, où un chiffre se perd vite. Le
+              montant est copié en chiffres nus, sans « FCFA » ni espaces, sinon
+              l'application le refuse. */}
+          <LigneCopiable libelle="Numéro à créditer" valeur={numero} />
+          <LigneCopiable
+            libelle="Montant exact"
+            valeur={String(order.total)}
+            affiche={formatFcfa(order.total)}
+          />
+          <LigneCopiable libelle="À indiquer en libellé" valeur={order.number} />
         </dl>
       ) : (
         // Aucun numéro renseigné : mieux vaut renvoyer vers la boutique que d'afficher
@@ -168,5 +170,49 @@ function ReglerCommande({ order }: { order: Order }) {
         </p>
       )}
     </section>
+  );
+}
+
+/** Une valeur à recopier dans l'application de paiement, avec son bouton de copie. */
+function LigneCopiable({
+  libelle,
+  valeur,
+  affiche,
+}: {
+  libelle: string;
+  valeur: string;
+  affiche?: string;
+}) {
+  const [copie, setCopie] = useState(false);
+
+  const copier = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(valeur);
+      setCopie(true);
+      // Le retour disparaît de lui-même : un « copié » qui reste laisse douter de ce
+      // qui a été copié en dernier.
+      setTimeout(() => setCopie(false), 2000);
+    } catch {
+      // Presse-papiers refusé par le navigateur : la valeur reste lisible et
+      // sélectionnable à la main, on ne bloque rien.
+      toast.error("Copie impossible — sélectionnez le texte à la main.");
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <dt className="text-muted-foreground">{libelle}</dt>
+      <dd className="flex items-center gap-2">
+        <span className="font-mono text-base">{affiche ?? valeur}</span>
+        <button
+          type="button"
+          onClick={() => void copier()}
+          aria-label={`Copier : ${libelle}`}
+          className="label-mono border border-border px-2 py-1 transition-colors hover:bg-muted"
+        >
+          {copie ? "Copié" : "Copier"}
+        </button>
+      </dd>
+    </div>
   );
 }
