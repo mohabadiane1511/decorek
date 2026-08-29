@@ -97,26 +97,33 @@ describe("accès au suivi", () => {
     expect(reponse.status).toBe(200);
   });
 
-  it("REFUSE le numéro seul, sans téléphone", async () => {
-    // Les numéros se suivent : qui connaît le sien devine ceux des autres. Sans cette
-    // seconde information, le suivi livrerait nom, téléphone et adresse de n'importe
-    // quel client à qui saurait compter.
+  it("donne l'état au numéro seul, mais rien de personnel", async () => {
+    // Le numéro seul suffit à savoir où en est la commande : c'est ce qu'on vient
+    // chercher. Il ne doit rien livrer d'autre — les numéros se suivent, et nom,
+    // téléphone, adresse et achats iraient à qui sait compter.
     const reponse = await suivre({ numero: commande.number });
-    expect(reponse.status).toBe(404);
+    expect(reponse.status).toBe(200);
+
+    const brut = await reponse.text();
+    const partiel = JSON.parse(brut) as Record<string, unknown>;
+    expect(partiel["status"]).toBe("en_attente");
+    expect(partiel["number"]).toBe(commande.number);
+
+    for (const secret of ["Awa Diop", TELEPHONE, "Almadies", "customer", "items", "total"]) {
+      expect(brut, `« ${secret} » ne doit pas sortir sans preuve`).not.toContain(secret);
+    }
   });
 
-  it("refuse un téléphone qui ne correspond pas", async () => {
+  it("ne livre pas le détail à un téléphone qui ne correspond pas", async () => {
     const reponse = await suivre({ numero: commande.number, telephone: "77 999 99 99" });
-    expect(reponse.status).toBe(404);
+    const brut = await reponse.text();
+    expect(brut).not.toContain("Awa Diop");
+    expect(brut).not.toContain("Almadies");
   });
 
-  it("répond la même chose pour un numéro inexistant et un téléphone erroné", async () => {
-    // Distinguer les deux cas révélerait quels numéros de commande existent.
-    const inexistant = await suivre({ numero: "DR-9999-9999", telephone: TELEPHONE });
-    const mauvaisTel = await suivre({ numero: commande.number, telephone: "77 000 00 00" });
-
-    expect(inexistant.status).toBe(mauvaisTel.status);
-    expect(await inexistant.text()).toBe(await mauvaisTel.text());
+  it("ne dit rien d'une commande qui n'existe pas", async () => {
+    const inexistant = await suivre({ numero: "DR-9999-9999" });
+    expect(inexistant.status).toBe(404);
   });
 
   it("n'expose jamais la note interne de l'équipe", async () => {

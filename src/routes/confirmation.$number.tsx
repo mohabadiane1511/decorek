@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckCircle2 } from "lucide-react";
+import { Check, CheckCircle2, Copy } from "lucide-react";
 import { ShopLayout } from "@/components/layout/ShopLayout";
 import { RecapMontants } from "@/components/shop/RecapMontants";
 import { formatFcfa, formatDate } from "@/lib/format";
@@ -120,17 +120,17 @@ function ReglerCommande({ order }: { order: Order }) {
 
       {numero ? (
         <dl className="mt-5 space-y-3 text-sm">
-          {/* Les trois valeurs se recopient dans l'application de paiement : les rendre
-              copiables évite une saisie à la main, où un chiffre se perd vite. Le
-              montant est copié en chiffres nus, sans « FCFA » ni espaces, sinon
-              l'application le refuse. */}
+          {/* Seul le numéro se copie : c'est lui qu'on saisit dans l'application de
+              paiement, et où un chiffre perdu envoie l'argent ailleurs. */}
           <LigneCopiable libelle="Numéro à créditer" valeur={numero} />
-          <LigneCopiable
-            libelle="Montant exact"
-            valeur={String(order.total)}
-            affiche={formatFcfa(order.total)}
-          />
-          <LigneCopiable libelle="À indiquer en libellé" valeur={order.number} />
+          <div className="flex flex-wrap justify-between gap-2">
+            <dt className="text-muted-foreground">Montant exact</dt>
+            <dd className="font-mono text-base">{formatFcfa(order.total)}</dd>
+          </div>
+          <div className="flex flex-wrap justify-between gap-2">
+            <dt className="text-muted-foreground">À indiquer en libellé</dt>
+            <dd className="font-mono text-base">{order.number}</dd>
+          </div>
         </dl>
       ) : (
         // Aucun numéro renseigné : mieux vaut renvoyer vers la boutique que d'afficher
@@ -174,15 +174,7 @@ function ReglerCommande({ order }: { order: Order }) {
 }
 
 /** Une valeur à recopier dans l'application de paiement, avec son bouton de copie. */
-function LigneCopiable({
-  libelle,
-  valeur,
-  affiche,
-}: {
-  libelle: string;
-  valeur: string;
-  affiche?: string;
-}) {
+function LigneCopiable({ libelle, valeur }: { libelle: string; valeur: string }) {
   const [copie, setCopie] = useState(false);
 
   const copier = async (): Promise<void> => {
@@ -203,14 +195,21 @@ function LigneCopiable({
     <div className="flex flex-wrap items-center justify-between gap-2">
       <dt className="text-muted-foreground">{libelle}</dt>
       <dd className="flex items-center gap-2">
-        <span className="font-mono text-base">{affiche ?? valeur}</span>
+        <span className="font-mono text-base">{valeur}</span>
         <button
           type="button"
           onClick={() => void copier()}
+          // L'intitulé reste porté par le libellé accessible : une icône seule ne dit
+          // rien à qui navigue à la voix.
           aria-label={`Copier : ${libelle}`}
-          className="label-mono border border-border px-2 py-1 transition-colors hover:bg-muted"
+          title="Copier"
+          className="grid h-8 w-8 shrink-0 place-items-center border border-border transition-colors hover:bg-muted"
         >
-          {copie ? "Copié" : "Copier"}
+          {copie ? (
+            <Check className="h-4 w-4 text-orange-brand" strokeWidth={1.75} />
+          ) : (
+            <Copy className="h-4 w-4" strokeWidth={1.5} />
+          )}
         </button>
       </dd>
     </div>

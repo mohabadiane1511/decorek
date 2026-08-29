@@ -37,21 +37,19 @@ test("la confirmation donne le numéro à créditer et le montant exact", async 
   await expect(page.getByText(numero).first()).toBeVisible();
 });
 
-test("le numéro, le montant et la référence se copient", async ({ page, context }) => {
+test("le numéro à créditer se copie d'un bouton", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  const numero = await commander(page, "Wave");
+  await commander(page, "Wave");
 
+  // Seul le numéro se copie : c'est lui qu'on saisit dans l'application de paiement,
+  // et où un chiffre perdu envoie l'argent ailleurs.
   await page.getByRole("button", { name: "Copier : Numéro à créditer" }).click();
-  await expect(page.getByRole("button", { name: /Copier : Numéro/ })).toContainText("Copié");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("+221 77 000 11 22");
 
-  // Le montant part en chiffres nus : « 13 000 FCFA » serait refusé par l'application
-  // de paiement, où l'on saisit un nombre.
-  await page.getByRole("button", { name: "Copier : Montant exact" }).click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^\d+$/);
-
-  await page.getByRole("button", { name: "Copier : À indiquer en libellé" }).click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(numero);
+  // Le bouton confirme d'une coche, sans texte : l'intitulé reste porté par le libellé
+  // accessible, pour qui navigue à la voix.
+  await expect(page.getByRole("button", { name: "Copier : Numéro à créditer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Copier : Montant/ })).toHaveCount(0);
 });
 
 test("le bouton WhatsApp porte toute la commande dans son message", async ({ page }) => {

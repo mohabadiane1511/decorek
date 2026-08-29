@@ -31,19 +31,24 @@ test("le suivi affiche la commande avec numéro et téléphone", async ({ page }
   await expect(page.getByText(/En attente/i).first()).toBeVisible();
 });
 
-test("le numéro seul ne suffit pas à consulter une commande", async ({ page }) => {
+test("le numéro seul donne l'état, sans livrer les coordonnées", async ({ page }) => {
   const numero = await commander(page);
 
   await page.goto("/suivi");
   await page.getByLabel("Numéro de commande").fill(numero);
-  // Téléphone volontairement laissé vide : les numéros se suivent, et sans seconde
-  // information n'importe qui lirait les coordonnées des autres clients.
+  // Téléphone volontairement laissé vide : savoir où en est sa commande ne doit rien
+  // demander de plus, mais les numéros se suivent — le détail reste protégé.
   await page.getByRole("button", { name: "Rechercher" }).click();
 
-  await expect(page.getByText(/Aucune commande ne correspond/i)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(numero)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/En attente/i).first()).toBeVisible();
+
+  await expect(page.getByText("Awa Diop")).toHaveCount(0);
+  await expect(page.getByText(/Route des Almadies/)).toHaveCount(0);
+  await expect(page.getByText(/Ajoutez le téléphone/)).toBeVisible();
 });
 
-test("un téléphone erroné est refusé comme un numéro inexistant", async ({ page }) => {
+test("un téléphone erroné n'ouvre pas le détail de la commande", async ({ page }) => {
   const numero = await commander(page);
 
   await page.goto("/suivi");
@@ -51,5 +56,9 @@ test("un téléphone erroné est refusé comme un numéro inexistant", async ({ 
   await page.getByLabel("Téléphone").fill("77 000 00 00");
   await page.getByRole("button", { name: "Rechercher" }).click();
 
-  await expect(page.getByText(/Aucune commande ne correspond/i)).toBeVisible({ timeout: 15_000 });
+  // L'état s'affiche, le reste non : sinon un numéro deviné suffirait à lire les
+  // coordonnées et les achats d'une autre cliente.
+  await expect(page.getByText(numero)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Awa Diop")).toHaveCount(0);
+  await expect(page.getByText(/Sous-assiette/)).toHaveCount(0);
 });

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { OrderTimeline } from "@/components/shop/OrderTimeline";
 import { formatFcfa, formatDate } from "@/lib/format";
 import type { Order } from "@/data/types";
-import { api } from "@/lib/api";
+import { api, type SuiviCommande } from "@/lib/api";
 import { statusLabels, useStore } from "@/lib/store";
 
 export const Route = createFileRoute("/suivi")({
@@ -29,7 +29,7 @@ function Suivi() {
   const { user } = useStore();
   const [q, setQ] = useState("");
   const [telephone, setTelephone] = useState("");
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<SuiviCommande | null>(null);
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
 
@@ -65,16 +65,20 @@ function Suivi() {
             aria-label="Numéro de commande"
             className="rounded-none"
           />
-          {/* Le téléphone n'est demandé qu'aux visiteurs non connectés : un client
-              identifié accède directement à ses propres commandes. */}
+          {/* Facultatif, et seulement pour qui n'est pas connecté : le numéro seul
+              donne déjà l'état de la commande. Le téléphone débloque le détail —
+              articles et montants — que le numéro seul ne doit pas livrer, puisqu'il
+              se devine. */}
           {!user && (
-            <Input
-              value={telephone}
-              onChange={(e) => setTelephone(e.target.value)}
-              placeholder="Téléphone utilisé lors de la commande"
-              aria-label="Téléphone"
-              className="rounded-none"
-            />
+            <>
+              <Input
+                value={telephone}
+                onChange={(e) => setTelephone(e.target.value)}
+                placeholder="Téléphone (facultatif, pour voir le détail)"
+                aria-label="Téléphone"
+                className="rounded-none"
+              />
+            </>
           )}
           <button
             type="submit"
@@ -97,30 +101,41 @@ function Suivi() {
             <div className="mt-6">
               <OrderTimeline status={order.status} />
             </div>
-            <ul className="mt-6 space-y-3 border-t border-border pt-5 text-sm">
-              {order.items.map((i) => (
-                <li key={i.productId} className="flex items-center justify-between gap-3">
-                  <span className="flex min-w-0 items-center gap-3">
-                    {i.image ? (
-                      <img
-                        src={i.image}
-                        alt={i.name}
-                        loading="lazy"
-                        className="h-14 w-14 shrink-0 border border-border object-cover"
-                      />
-                    ) : (
-                      <span className="h-14 w-14 shrink-0 border border-border bg-muted" />
-                    )}
-                    <span className="min-w-0 truncate text-muted-foreground">
-                      {i.name} × {i.quantity}
-                    </span>
-                  </span>
-                  <span>{formatFcfa(i.price * i.quantity)}</span>
-                </li>
-              ))}
-            </ul>
+            {!("items" in order) ? (
+              // Consultée au seul numéro : l'état suffit à rassurer, le reste attend
+              // que la cliente prouve que la commande est la sienne.
+              <p className="mt-6 border-t border-border pt-5 text-sm text-muted-foreground">
+                Ajoutez le téléphone utilisé lors de la commande pour voir le détail des articles et
+                le montant.
+              </p>
+            ) : (
+              <>
+                <ul className="mt-6 space-y-3 border-t border-border pt-5 text-sm">
+                  {order.items.map((i) => (
+                    <li key={i.productId} className="flex items-center justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-3">
+                        {i.image ? (
+                          <img
+                            src={i.image}
+                            alt={i.name}
+                            loading="lazy"
+                            className="h-14 w-14 shrink-0 border border-border object-cover"
+                          />
+                        ) : (
+                          <span className="h-14 w-14 shrink-0 border border-border bg-muted" />
+                        )}
+                        <span className="min-w-0 truncate text-muted-foreground">
+                          {i.name} × {i.quantity}
+                        </span>
+                      </span>
+                      <span>{formatFcfa(i.price * i.quantity)}</span>
+                    </li>
+                  ))}
+                </ul>
 
-            <RecapMontants order={order} />
+                <RecapMontants order={order} />
+              </>
+            )}
           </div>
         )}
       </div>

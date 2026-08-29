@@ -1,5 +1,6 @@
 import type {
   Address,
+  OrderStatus,
   Category,
   DeliveryRegion,
   Order,
@@ -210,6 +211,15 @@ export type EntreeAdresse = {
   isDefault?: boolean | undefined;
 };
 
+/**
+ * Ce que le suivi renvoie.
+ *
+ * Le numéro seul donne l'état de la commande. Le détail — articles, montants, adresse —
+ * n'arrive qu'en prouvant qu'elle est la sienne : les numéros se suivent, et les livrer
+ * au premier venu reviendrait à publier le fichier clients.
+ */
+export type SuiviCommande = Order | { number: string; createdAt: string; status: OrderStatus };
+
 export type PageProduits = {
   items: Product[];
   total: number;
@@ -419,7 +429,7 @@ export const api = {
    * consulter les coordonnées d'autres clients.
    */
   suivreCommande: (numero: string, telephone?: string) =>
-    envoyer<Order>("/api/commandes/suivi", { numero, telephone }),
+    envoyer<SuiviCommande>("/api/commandes/suivi", { numero, telephone }),
 
   /** Demande un lien de réinitialisation du mot de passe. */
   reinitialiserMotDePasse: (email: string) =>

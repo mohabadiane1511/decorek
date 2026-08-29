@@ -72,13 +72,24 @@ export function routesSuivi(prisma: PrismaClient, auth: Auth, redis: Redis): Hon
       if (!commande) throw refus();
 
       const estLaSienne = session !== null && commande.userId === session.userId;
-      if (!estLaSienne) {
-        if (!telephone || !memeTelephone(telephone, commande.customerPhone)) throw refus();
-      }
+      const identifiee =
+        estLaSienne ||
+        (telephone !== undefined && memeTelephone(telephone, commande.customerPhone));
 
-      // Sans note interne : c'est une donnée de gestion, pas une information
-      // destinée au client.
-      const suivi = versCommande(commande);
+      // Le numéro seul suffit à savoir où en est la commande : c'est ce qu'on vient
+      // chercher, et l'exiger avec le téléphone décourageait des clientes pressées.
+      //
+      // Il ne donne en revanche rien de personnel. Les numéros se suivent : qui connaît
+      // le sien devine ceux des autres, et livrer nom, téléphone, adresse et achats à
+      // qui sait compter reviendrait à publier le fichier clients. Ce détail n'apparaît
+      // qu'en prouvant que la commande est la sienne — par le téléphone ou la session.
+      const suivi = identifiee
+        ? versCommande(commande)
+        : {
+            number: commande.number,
+            createdAt: commande.createdAt.toISOString(),
+            status: commande.status,
+          };
 
       // Jamais mis en cache : la réponse porte des données personnelles et doit
       // refléter le statut réel, y compris juste après une mise à jour par l'équipe.
