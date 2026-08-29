@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { formatFcfa } from "@/lib/format";
+import { LIBELLES_PAIEMENT } from "@/lib/paiement";
 import { api } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import type { Address, Order } from "@/data/types";
@@ -80,6 +81,8 @@ function Commande() {
   }, [adresses, regions, adressePrise]);
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
+  // Le règlement se fait avant la livraison : Wave par défaut, le plus répandu.
+  const [paiement, setPaiement] = useState<"wave" | "orange_money">("wave");
   const [code, setCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [appliedCode, setAppliedCode] = useState<string | undefined>();
@@ -144,6 +147,7 @@ function Commande() {
       // Aucun montant n'est transmis : le serveur relit les prix en base et calcule
       // lui-même le total. Ce que l'écran affiche n'est qu'un aperçu.
       const commande = await placeOrder({
+        paymentMethod: paiement,
         customer: {
           name: name.trim(),
           phone: phone.trim(),
@@ -320,12 +324,39 @@ function Commande() {
 
           <section>
             <h2 className="font-display text-xl tracking-tight">3. Paiement</h2>
-            <div className="mt-5 border border-border p-5">
-              <p className="text-sm font-medium">Paiement à la livraison</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Espèces ou transfert mobile, à remettre au livreur à la réception. Aucun paiement en
-                ligne n'est demandé.
-              </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Le règlement se fait avant la livraison. Après validation, vous recevrez le numéro où
+              envoyer le montant, puis vous nous transmettrez votre reçu sur WhatsApp.
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {(["wave", "orange_money"] as const).map((mode) => (
+                <label
+                  key={mode}
+                  className={`flex cursor-pointer items-start gap-3 border p-5 transition-colors ${
+                    paiement === mode
+                      ? "border-foreground bg-muted"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paiement"
+                    value={mode}
+                    checked={paiement === mode}
+                    onChange={() => setPaiement(mode)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">{LIBELLES_PAIEMENT[mode]}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {mode === "wave"
+                        ? "Transfert depuis votre compte Wave."
+                        : "Transfert depuis votre compte Orange Money."}
+                    </span>
+                  </span>
+                </label>
+              ))}
             </div>
           </section>
         </div>

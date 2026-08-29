@@ -91,12 +91,11 @@ describe("zones de livraison", () => {
 });
 
 describe("numéros de paiement", () => {
-  it("enregistre les numéros Wave et Orange Money", async () => {
-    const reponse = await contexte.app.request("/api/contenu");
-    const avant = (await reponse.json()) as SiteContent;
-    // Vides tant qu'ils ne sont pas renseignés : mieux vaut ne rien afficher qu'un
-    // numéro faux, sur lequel une cliente enverrait son argent.
-    expect(avant.waveNumber).toBe("");
-    expect(avant.orangeMoneyNumber).toBe("");
+  it("expose les numéros Wave et Orange Money", async () => {
+    // Ce sont eux que la cliente lit pour envoyer son argent : les servir faux, ou pas
+    // du tout, envoie le paiement nulle part.
+    const contenu = (await (await contexte.app.request("/api/contenu")).json()) as SiteContent;
+    expect(contenu.waveNumber).toBe(seedContent.waveNumber);
+    expect(contenu.orangeMoneyNumber).toBe(seedContent.orangeMoneyNumber);
   });
 });

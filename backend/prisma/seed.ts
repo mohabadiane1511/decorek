@@ -165,6 +165,8 @@ export async function semer(databaseUrl: string): Promise<void> {
       bannerSubtitle: seedContent.bannerSubtitle,
       bannerCta: seedContent.bannerCta,
       whatsapp: seedContent.whatsapp,
+      waveNumber: seedContent.waveNumber,
+      orangeMoneyNumber: seedContent.orangeMoneyNumber,
       facebook: seedContent.facebook,
       instagram: seedContent.instagram,
       tiktok: seedContent.tiktok,

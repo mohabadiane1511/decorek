@@ -399,8 +399,10 @@ export const seedContent: SiteContent = {
   bannerTitle: "L'art de recevoir, version sénégalaise",
   bannerSubtitle: "Vaisselle et décoration d'exception, choisies pour sublimer votre intérieur.",
   bannerCta: "Découvrir la collection",
-  waveNumber: "",
-  orangeMoneyNumber: "",
+  // Numéros de démonstration : sans eux, le parcours de paiement ne peut pas être
+  // exercé. La boutique renseigne les siens depuis le back-office.
+  waveNumber: "+221 77 000 11 22",
+  orangeMoneyNumber: "+221 78 000 33 44",
   whatsapp: "221771234567",
   facebook: "",
   instagram: "",

@@ -1,4 +1,4 @@
-import type { Order, OrderItem } from "../../src/data/types.js";
+import type { Order, OrderItem, PaymentMethod } from "../../src/data/types.js";
 import { versCommande } from "./conversions.js";
 import { ErreurApi } from "./erreurs.js";
 import type { PrismaClient } from "./generated/prisma/client.js";
@@ -10,6 +10,7 @@ export type DemandeCommande = {
   delivery: { areaId: string; address: string; note?: string | undefined };
   items: LigneDemandee[];
   promoCode?: string | undefined;
+  paymentMethod: PaymentMethod;
   /** Identifiant de l'utilisateur connecté, `null` pour une commande en invité. */
   userId: string | null;
 };
@@ -206,6 +207,7 @@ export async function creerCommande(
         promoCode: codePromo ?? null,
         total,
         status: "en_attente",
+        paymentMethod: demande.paymentMethod,
         paid: false,
         userId: demande.userId,
         items: { create: lignes },

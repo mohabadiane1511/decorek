@@ -192,6 +192,7 @@ export type EntreePromo = {
 };
 
 export type DemandeCommande = {
+  paymentMethod: "wave" | "orange_money";
   customer: { name: string; phone: string; email?: string | undefined };
   delivery: { areaId: string; address: string; note?: string | undefined };
   items: LigneDemandee[];
@@ -303,6 +304,10 @@ export const api = {
       email,
       callbackURL: "/compte",
     }),
+
+  /** Signale que la cliente a réglé sa commande : l'équipe doit vérifier. */
+  annoncerPaiement: (numero: string, telephone?: string) =>
+    envoyer<{ annonce: boolean }>("/api/commandes/paiement-annonce", { numero, telephone }),
 
   /**
    * Historique de la cliente connectée.

@@ -51,6 +51,7 @@ async function demande(surcharges: Corps = {}): Promise<Corps> {
   });
   const zone = await contexte.prisma.deliveryArea.findFirstOrThrow({ where: { name: "Almadies" } });
   return {
+    paymentMethod: "wave",
     customer: { name: "Awa Diop", phone: "+221 77 123 45 67" },
     delivery: { areaId: zone.id, address: "Route des Almadies, villa 12" },
     items: [{ productId: produit.id, quantity: 2 }],
@@ -179,6 +180,7 @@ describe("création d'une commande", () => {
 
     // 45 000 × 3 = 135 000, au-dessus du seuil de 100 000.
     const reponse = await commander({
+      paymentMethod: "wave",
       customer: { name: "Awa Diop", phone: "+221 77 123 45 67" },
       delivery: { areaId: zone.id, address: "Route des Almadies, villa 12" },
       items: [{ productId: cher.id, quantity: 3 }],
@@ -200,6 +202,7 @@ describe("stock insuffisant", () => {
     });
 
     const reponse = await commander({
+      paymentMethod: "wave",
       customer: { name: "Awa Diop", phone: "+221 77 123 45 67" },
       delivery: { areaId: zone.id, address: "Villa 12" },
       items: [{ productId: produit.id, quantity: produit.stock + 5 }],
@@ -226,6 +229,7 @@ describe("stock insuffisant", () => {
     });
 
     const corps = {
+      paymentMethod: "wave",
       customer: { name: "Awa Diop", phone: "+221 77 123 45 67" },
       delivery: { areaId: zone.id, address: "Villa 12" },
       items: [{ productId: produit.id, quantity: 1 }],
@@ -260,6 +264,7 @@ describe("codes promotionnels", () => {
 
     const reponse = await commander(
       {
+        paymentMethod: "wave",
         customer: { name: "Awa Diop", phone: "+221 77 123 45 67" },
         delivery: { areaId: zone.id, address: "Villa 12" },
         items: [{ productId: cher.id, quantity: 1 }],
@@ -293,6 +298,7 @@ describe("codes promotionnels", () => {
       where: { name: "Almadies" },
     });
     const corps = {
+      paymentMethod: "wave",
       customer: { name: "Awa Diop", phone: "+221 77 123 45 67" },
       delivery: { areaId: zone.id, address: "Villa 12" },
       items: [{ productId: cher.id, quantity: 1 }],
@@ -346,7 +352,12 @@ describe("validation de la demande", () => {
   });
 
   it("refuse un téléphone manquant", async () => {
-    const reponse = await commander(await demande({ customer: { name: "Awa Diop", phone: "" } }));
+    const reponse = await commander(
+      await demande({
+        paymentMethod: "wave",
+        customer: { name: "Awa Diop", phone: "" },
+      }),
+    );
     expect(reponse.status).toBe(400);
   });
 });
@@ -373,6 +384,7 @@ describe("historique de la cliente", () => {
     const avant = (await (
       await commander(
         await demande({
+          paymentMethod: "wave",
           customer: { name: "Awa Diop", phone: "+221 77 123 45 67", email: CLIENT.email },
         }),
       )
@@ -387,6 +399,7 @@ describe("historique de la cliente", () => {
     const autre = (await (
       await commander(
         await demande({
+          paymentMethod: "wave",
           customer: { name: "Fatou Sow", phone: "+221 78 000 00 00", email: "fatou@test.sn" },
         }),
       )

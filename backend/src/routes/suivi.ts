@@ -87,5 +87,52 @@ export function routesSuivi(prisma: PrismaClient, auth: Auth, redis: Redis): Hon
     },
   );
 
+  /**
+   * La cliente déclare avoir réglé sa commande.
+   *
+   * Protégé comme le suivi : le numéro de commande seul ne suffit pas, ils se
+   * devinent. Rien n'est marqué payé ici — seul le statut change, pour signaler à
+   * l'équipe qu'il y a une preuve à contrôler dans Wave ou Orange Money. Une capture
+   * d'écran se falsifie ; la vérification reste humaine.
+   */
+  routes.post(
+    "/commandes/paiement-annonce",
+    limiter(redis, "suivi", { max: 15, fenetreSecondes: 60 }),
+    zValidator("json", schemaSuivi, (resultat, c) => {
+      if (!resultat.success) {
+        return c.json(corpsErreur("VALIDATION", "Numéro de commande manquant."), 400);
+      }
+      return undefined;
+    }),
+    async (c) => {
+      const { numero, telephone } = c.req.valid("json");
+      const session = await lireSession(auth, prisma, c);
+
+      const commande = await prisma.order.findUnique({
+        where: { number: numero.trim().toUpperCase() },
+      });
+      const refus = () =>
+        new ErreurApi("INTROUVABLE", "Aucune commande ne correspond à ces informations.");
+      if (!commande) throw refus();
+
+      const estLaSienne = session !== null && commande.userId === session.userId;
+      if (!estLaSienne) {
+        if (!telephone || !memeTelephone(telephone, commande.customerPhone)) throw refus();
+      }
+
+      // Seule une commande encore en attente bascule : annoncer un paiement ne doit pas
+      // faire reculer une commande déjà confirmée, préparée ou livrée par l'équipe.
+      if (commande.status === "en_attente") {
+        await prisma.order.update({
+          where: { id: commande.id },
+          data: { status: "paiement_annonce" },
+        });
+      }
+
+      c.header("Cache-Control", "no-store");
+      return c.json({ annonce: true });
+    },
+  );
+
   return routes;
 }

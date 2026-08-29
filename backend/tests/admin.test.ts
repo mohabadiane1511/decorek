@@ -60,6 +60,7 @@ async function commander(quantite = 2): Promise<Order> {
   });
   const zone = await contexte.prisma.deliveryArea.findFirstOrThrow({ where: { name: "Almadies" } });
   const reponse = await appeler("POST", "/api/commandes", undefined, {
+    paymentMethod: "wave",
     customer: { name: "Awa Diop", phone: "+221 77 123 45 67" },
     delivery: { areaId: zone.id, address: "Villa 12" },
     items: [{ productId: produit.id, quantity: quantite }],

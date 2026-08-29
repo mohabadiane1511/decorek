@@ -52,6 +52,7 @@ beforeEach(async () => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      paymentMethod: "wave",
       customer: { name: "Awa Diop", phone: TELEPHONE },
       delivery: { areaId: zone.id, address: "Route des Almadies, villa 12" },
       items: [{ productId: produit.id, quantity: 1 }],

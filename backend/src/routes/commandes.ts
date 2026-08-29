@@ -41,6 +41,9 @@ const schemaCommande = z.object({
     .min(1, "Votre panier est vide")
     .max(50),
   promoCode: z.string().trim().max(40).optional(),
+  // Le règlement se fait avant la livraison. « Espèces » n'est pas accepté ici :
+  // il ne subsiste que dans les commandes passées avant ce changement.
+  paymentMethod: z.enum(["wave", "orange_money"]),
 });
 
 const schemaVerificationPromo = z.object({
@@ -110,6 +113,7 @@ export function routesCommandes(
         delivery: demande.delivery,
         items: demande.items,
         promoCode: demande.promoCode,
+        paymentMethod: demande.paymentMethod,
         userId: session?.userId ?? null,
       });
 

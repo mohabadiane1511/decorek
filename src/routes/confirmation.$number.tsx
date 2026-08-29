@@ -4,6 +4,10 @@ import { ShopLayout } from "@/components/layout/ShopLayout";
 import { RecapMontants } from "@/components/shop/RecapMontants";
 import { formatFcfa, formatDate } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { useState } from "react";
+import { api } from "@/lib/api";
+import { LIBELLES_PAIEMENT, lienPreuvePaiement, numeroDePaiement } from "@/lib/paiement";
+import type { Order } from "@/data/types";
 
 export const Route = createFileRoute("/confirmation/$number")({
   head: () => ({
@@ -62,13 +66,15 @@ function Confirmation() {
               ))}
             </ul>
 
-            <RecapMontants order={order} libelleTotal="Total à payer à la livraison" />
+            <RecapMontants order={order} libelleTotal="Total à régler" />
             <p className="mt-4 text-muted-foreground">
               Livraison : {order.delivery.areaName}, {order.delivery.regionName} —{" "}
               {order.delivery.address}
             </p>
           </div>
         )}
+
+        {order && <ReglerCommande order={order} />}
 
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link to="/suivi" className="btn-square btn-solid">
@@ -85,5 +91,82 @@ function Confirmation() {
         </div>
       </div>
     </ShopLayout>
+  );
+}
+
+/**
+ * Comment régler la commande, et comment le faire savoir.
+ *
+ * Le paiement précède la livraison : cet écran doit donner le numéro, le montant exact
+ * et de quoi transmettre le reçu, sans que la cliente ait à chercher ailleurs. La
+ * référence à indiquer en libellé du transfert évite à la boutique de deviner quel
+ * virement correspond à quelle commande.
+ */
+function ReglerCommande({ order }: { order: Order }) {
+  const { content } = useStore();
+  const [annonce, setAnnonce] = useState(false);
+
+  const numero = numeroDePaiement(content, order.paymentMethod);
+  const lien = lienPreuvePaiement(order, content);
+
+  return (
+    <section className="mt-10 border border-foreground p-6 text-left">
+      <h2 className="font-display text-xl tracking-tight">
+        Régler par {LIBELLES_PAIEMENT[order.paymentMethod]}
+      </h2>
+
+      {numero ? (
+        <dl className="mt-5 space-y-3 text-sm">
+          <div className="flex flex-wrap justify-between gap-2">
+            <dt className="text-muted-foreground">Numéro à créditer</dt>
+            <dd className="font-mono text-base">{numero}</dd>
+          </div>
+          <div className="flex flex-wrap justify-between gap-2">
+            <dt className="text-muted-foreground">Montant exact</dt>
+            <dd className="font-mono text-base">{formatFcfa(order.total)}</dd>
+          </div>
+          <div className="flex flex-wrap justify-between gap-2">
+            <dt className="text-muted-foreground">À indiquer en libellé</dt>
+            <dd className="font-mono text-base">{order.number}</dd>
+          </div>
+        </dl>
+      ) : (
+        // Aucun numéro renseigné : mieux vaut renvoyer vers la boutique que d'afficher
+        // un vide où la cliente enverrait son argent au hasard.
+        <p className="mt-4 text-sm text-muted-foreground">
+          Contactez-nous pour recevoir les coordonnées de paiement.
+        </p>
+      )}
+
+      <p className="mt-5 text-sm text-muted-foreground">
+        Une fois le transfert effectué, envoyez-nous la capture de votre reçu. Votre commande est
+        préparée dès que nous l'avons vérifié.
+      </p>
+
+      {lien && (
+        <a
+          href={lien}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => {
+            setAnnonce(true);
+            // La commande passe en « paiement à vérifier » : l'équipe voit ainsi qu'une
+            // preuve l'attend. L'échec est sans conséquence — le message part quand même,
+            // et la vérification se fera à réception.
+            void api.annoncerPaiement(order.number, order.customer.phone).catch(() => undefined);
+          }}
+          className="btn-square btn-solid mt-6 inline-block"
+        >
+          J'ai payé — envoyer mon reçu
+        </a>
+      )}
+
+      {annonce && (
+        <p className="mt-4 text-sm text-muted-foreground">
+          N'oubliez pas de joindre la capture à votre message : WhatsApp ne peut pas l'attacher à
+          notre place.
+        </p>
+      )}
+    </section>
   );
 }
