@@ -463,6 +463,7 @@ export function orderNumber(): string {
 
 export const statusLabels: Record<OrderStatus, string> = {
   en_attente: "En attente",
+  paiement_annonce: "Paiement à vérifier",
   confirmee: "Confirmée",
   preparation: "En préparation",
   en_livraison: "En livraison",

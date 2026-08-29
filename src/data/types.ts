@@ -22,8 +22,12 @@ export type Product = {
   createdAt: string;
 };
 
+/** Comment la cliente règle sa commande. « especes » n'existe plus que dans l'historique. */
+export type PaymentMethod = "especes" | "wave" | "orange_money";
+
 export type OrderStatus =
   | "en_attente"
+  | "paiement_annonce"
   | "confirmee"
   | "preparation"
   | "en_livraison"
@@ -62,6 +66,7 @@ export type Order = {
   promoCode?: string | undefined;
   total: number;
   status: OrderStatus;
+  paymentMethod: PaymentMethod;
   paid: boolean;
   userEmail?: string | undefined;
   internalNote?: string | undefined;
@@ -97,6 +102,9 @@ export type SiteContent = {
   bannerSubtitle: string;
   bannerCta: string;
   whatsapp: string;
+  /** Numéros où la cliente envoie son paiement. Vides tant qu'ils ne sont pas renseignés. */
+  waveNumber: string;
+  orangeMoneyNumber: string;
   /**
    * Réseaux sociaux. Chaîne vide = absent du site : le lien n'est affiché que si la
    * page existe, plutôt que de mener vers un compte inexistant.

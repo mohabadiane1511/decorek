@@ -125,6 +125,10 @@ const schemaContenu = z.object({
   bannerSubtitle: z.string().trim().max(500),
   bannerCta: z.string().trim().max(80),
   whatsapp: z.string().trim().max(30),
+  // Numéros de paiement, facultatifs comme les réseaux sociaux : une version
+  // antérieure du front qui ne les envoie pas ne doit pas voir sa requête refusée.
+  waveNumber: z.string().trim().max(30).default(""),
+  orangeMoneyNumber: z.string().trim().max(30).default(""),
   // Adresse complète attendue, ou chaîne vide : un identifiant seul (« @decorek »)
   // ne permet pas de construire un lien fiable, chaque réseau ayant sa propre forme.
   //

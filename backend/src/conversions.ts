@@ -1,4 +1,4 @@
-import type { Order, OrderStatus } from "../../src/data/types.js";
+import type { PaymentMethod, Order, OrderStatus } from "../../src/data/types.js";
 
 /**
  * Conversion des commandes vers le contrat exposé au front.
@@ -30,6 +30,7 @@ export type CommandeEnBase = {
   promoCode: string | null;
   total: number;
   status: OrderStatus;
+  paymentMethod: PaymentMethod;
   paid: boolean;
   userId?: string | null;
   internalNote?: string | null;
@@ -75,6 +76,7 @@ export function versCommande(
     promoCode: c.promoCode ?? undefined,
     total: c.total,
     status: c.status,
+    paymentMethod: c.paymentMethod,
     paid: c.paid,
     userEmail: c.customerEmail ?? undefined,
     // La note de gestion n'accompagne la commande que vers le back-office : c'est une

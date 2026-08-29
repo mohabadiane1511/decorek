@@ -268,6 +268,7 @@ export const seedOrders: Order[] = [
     promoCode: "BIENVENUE10",
     total: 59200,
     status: "livree",
+    paymentMethod: "especes",
     paid: true,
     userEmail: "awa.diop@example.sn",
   },
@@ -290,6 +291,7 @@ export const seedOrders: Order[] = [
     discount: 0,
     total: 184000,
     status: "en_livraison",
+    paymentMethod: "especes",
     paid: false,
   },
   {
@@ -324,6 +326,7 @@ export const seedOrders: Order[] = [
     discount: 0,
     total: 48500,
     status: "confirmee",
+    paymentMethod: "especes",
     paid: false,
     userEmail: "fatou.n@example.sn",
   },
@@ -352,6 +355,7 @@ export const seedOrders: Order[] = [
     discount: 0,
     total: 70000,
     status: "en_attente",
+    paymentMethod: "especes",
     paid: false,
   },
   {
@@ -386,6 +390,7 @@ export const seedOrders: Order[] = [
     discount: 0,
     total: 47500,
     status: "preparation",
+    paymentMethod: "especes",
     paid: false,
   },
 ];
@@ -394,6 +399,8 @@ export const seedContent: SiteContent = {
   bannerTitle: "L'art de recevoir, version sénégalaise",
   bannerSubtitle: "Vaisselle et décoration d'exception, choisies pour sublimer votre intérieur.",
   bannerCta: "Découvrir la collection",
+  waveNumber: "",
+  orangeMoneyNumber: "",
   whatsapp: "221771234567",
   facebook: "",
   instagram: "",

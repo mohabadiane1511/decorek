@@ -89,3 +89,14 @@ describe("zones de livraison", () => {
     }
   });
 });
+
+describe("numéros de paiement", () => {
+  it("enregistre les numéros Wave et Orange Money", async () => {
+    const reponse = await contexte.app.request("/api/contenu");
+    const avant = (await reponse.json()) as SiteContent;
+    // Vides tant qu'ils ne sont pas renseignés : mieux vaut ne rien afficher qu'un
+    // numéro faux, sur lequel une cliente enverrait son argent.
+    expect(avant.waveNumber).toBe("");
+    expect(avant.orangeMoneyNumber).toBe("");
+  });
+});

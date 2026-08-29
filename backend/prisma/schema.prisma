@@ -104,8 +104,19 @@ model DeliveryArea {
 
 // ---------------------------------------------------------------- Commandes
 
+enum PaymentMethod {
+  especes
+  wave
+  orange_money
+
+  @@map("payment_method")
+}
+
 enum OrderStatus {
   en_attente
+  /// La cliente déclare avoir payé et envoyé sa preuve. L'équipe doit encore vérifier
+  /// dans l'application Wave ou Orange Money : une capture d'écran se falsifie.
+  paiement_annonce
   confirmee
   preparation
   en_livraison
@@ -132,6 +143,10 @@ model Order {
   address     String
   deliveryFee Int     @map("delivery_fee")
   note        String?
+
+  /// Espèces conservé pour l'historique : c'était le seul mode avant le passage au
+  /// paiement d'avance. Il n'est plus proposé à la commande.
+  paymentMethod PaymentMethod @default(especes) @map("payment_method")
 
   subtotal  Int
   discount  Int         @default(0)
@@ -395,6 +410,10 @@ model SiteContent {
   bannerTitle      String   @map("banner_title")
   bannerSubtitle   String   @map("banner_subtitle")
   bannerCta        String   @map("banner_cta")
+  /// Numéros où les clientes envoient leur paiement. Vides tant qu'ils ne sont pas
+  /// renseignés : mieux vaut ne rien afficher qu'un numéro faux.
+  waveNumber        String @default("") @map("wave_number")
+  orangeMoneyNumber String @default("") @map("orange_money_number")
   whatsapp         String
   facebook         String   @default("")
   instagram        String   @default("")
