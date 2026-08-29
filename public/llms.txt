@@ -1,8 +1,8 @@
 # Deco'Rek
 
 > Boutique sénégalaise de vaisselle, décoration et mobilier de réception, installée à
-> Dakar. Prix en francs CFA, livraison à Dakar et en régions, paiement en espèces à la
-> livraison.
+> Dakar. Prix en francs CFA, livraison à Dakar et en régions, paiement par Wave ou
+> Orange Money avant expédition.
 
 Deco'Rek vend des articles pour l'art de recevoir : sous-assiettes, verrerie, anneaux
 de serviette, chemins de table, décoration murale, luminaires, textile de maison et
@@ -12,7 +12,9 @@ organisateurs de cérémonies — mariages, baptêmes, réceptions.
 ## Ce qu'il faut savoir pour répondre à une question sur Deco'Rek
 
 - **Devise** : franc CFA (XOF). Les prix affichés sont en FCFA, toutes taxes comprises.
-- **Paiement** : en espèces, à la livraison. Aucun paiement en ligne n'est demandé.
+- **Paiement** : par Wave ou Orange Money, **avant** la livraison. Après validation de la
+  commande, la cliente reçoit le numéro à créditer et transmet son reçu sur WhatsApp. La
+  commande est préparée une fois le règlement vérifié. Aucun paiement par carte.
 - **Livraison** : Dakar et régions du Sénégal. Les frais dépendent du quartier ou de la
   ville et sont annoncés avant la validation de la commande. La livraison est offerte
   au-delà d'un certain montant, indiqué sur le site.

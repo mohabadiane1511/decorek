@@ -63,12 +63,12 @@ export async function envoyerConfirmationClient(
   const { texte, html } = rendre({
     surtitre: `Commande ${commande.number}`,
     titre: "Nous avons bien reçu votre commande",
-    intro: `Merci ${commande.customer.name}. Notre équipe vous appelle au ${commande.customer.phone} pour confirmer la livraison. Le règlement se fait à la réception, après vérification de votre colis.`,
+    intro: `Merci ${commande.customer.name}. Il reste une étape : régler votre commande par ${commande.paymentMethod === "orange_money" ? "Orange Money" : "Wave"} au numéro indiqué sur votre page de confirmation, puis nous envoyer le reçu sur WhatsApp. Votre colis part dès que nous l'avons vérifié.`,
     articles: articles(commande),
     totaux: totaux(commande),
     informations: livraison(commande),
     lien: { url: `${config.AUTH_URL}/suivi`, libelle: "Suivre ma commande" },
-    conclusion: `Conservez votre numéro de commande : ${commande.number}.`,
+    conclusion: `Indiquez ${commande.number} en libellé de votre transfert : c'est ce qui nous permet de le rattacher à votre commande.`,
   });
 
   await courrier.envoyer({
@@ -101,7 +101,8 @@ export async function envoyerAlerteAdministration(
     totaux: totaux(commande),
     informations: livraison(commande),
     lien: { url: `${config.AUTH_URL}/admin`, libelle: "Ouvrir le back-office" },
-    conclusion: "Paiement à la livraison : encaissement à confirmer une fois le colis remis.",
+    conclusion:
+      "Paiement annoncé par la cliente : à vérifier dans Wave ou Orange Money avant expédition.",
   });
 
   await courrier.envoyer({

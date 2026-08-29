@@ -148,7 +148,7 @@ export function Footer() {
 
       <div className="mx-auto max-w-7xl border-t border-background/15 px-4 py-6 sm:px-6">
         <p className="label-mono text-background/50">
-          © {new Date().getFullYear()} Deco'Rek — Paiement à la livraison uniquement.
+          © {new Date().getFullYear()} Deco'Rek — Paiement par Wave ou Orange Money avant livraison.
         </p>
       </div>
     </footer>

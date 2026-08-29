@@ -21,6 +21,7 @@ import { formatDate, formatFcfa } from "@/lib/format";
 import { api, type FiltresAdmin, type PageAdmin } from "@/lib/api";
 import { useDebounce } from "@/lib/useDebounce";
 import { newId, statusLabels, useStore } from "@/lib/store";
+import { LIBELLES_PAIEMENT } from "@/lib/paiement";
 import type { Category, DeliveryRegion, OrderStatus, Product, PromoCode } from "@/data/types";
 
 export const Route = createFileRoute("/admin")({
@@ -352,7 +353,7 @@ function Dashboard() {
           value={formatFcfa(data.chiffreAffaires)}
           hint="Commandes valides"
         />
-        <Card title="Encaissé" value={formatFcfa(data.encaisse)} hint="Confirmé à la livraison" />
+        <Card title="Encaissé" value={formatFcfa(data.encaisse)} hint="Paiements vérifiés" />
         <Card title="Commandes" value={String(data.commandes)} hint={`${data.valides} valides`} />
         <Card title="Stock bas" value={String(data.stockBas)} hint="Articles à réassortir" />
       </div>
@@ -511,6 +512,8 @@ function Orders() {
               <p className="text-lg">{formatFcfa(o.total)}</p>
             </div>
 
+            <p className="label-mono mt-2">Réglé par {LIBELLES_PAIEMENT[o.paymentMethod]}</p>
+
             <p className="mt-3 text-sm text-muted-foreground">
               {o.delivery.areaName}, {o.delivery.regionName} — {o.delivery.address} (
               {formatFcfa(o.delivery.fee)})
@@ -562,12 +565,19 @@ function Orders() {
                   onChange={(e) =>
                     changer(
                       () => updateOrder(o.id, { paid: e.target.checked }),
-                      "Encaissement enregistré",
+                      "Paiement enregistré",
                     )
                   }
                 />
-                Encaissement confirmé
+                Paiement vérifié
               </label>
+              {o.status === "paiement_annonce" && !o.paid && (
+                // Une capture d'écran se falsifie en deux minutes : cocher sur sa seule
+                // foi revient à expédier sans avoir été payée.
+                <span className="label-mono text-orange-brand">
+                  Vérifiez dans {LIBELLES_PAIEMENT[o.paymentMethod]} avant d'expédier
+                </span>
+              )}
               <Input
                 defaultValue={o.internalNote ?? ""}
                 placeholder="Note interne"
@@ -1341,6 +1351,34 @@ function ContentTab() {
             id="whatsapp"
             value={draft.whatsapp}
             onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })}
+            className="mt-1.5 rounded-none"
+          />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            C'est sur ce numéro que les clientes envoient leur reçu de paiement.
+          </p>
+        </div>
+
+        {/* Numéros de paiement : ce sont eux que la cliente lit pour envoyer son
+            argent. Laissés vides, la page de confirmation invite à vous contacter
+            plutôt que d'afficher un vide où le paiement partirait au hasard. */}
+        <div>
+          <Label htmlFor="wave">Numéro Wave</Label>
+          <Input
+            id="wave"
+            value={draft.waveNumber}
+            onChange={(e) => setDraft({ ...draft, waveNumber: e.target.value })}
+            placeholder="+221 77 000 00 00"
+            className="mt-1.5 rounded-none"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="orange-money">Numéro Orange Money</Label>
+          <Input
+            id="orange-money"
+            value={draft.orangeMoneyNumber}
+            onChange={(e) => setDraft({ ...draft, orangeMoneyNumber: e.target.value })}
+            placeholder="+221 78 000 00 00"
             className="mt-1.5 rounded-none"
           />
         </div>

@@ -39,7 +39,7 @@ export const Route = createFileRoute("/produit/$slug")({
     // s'affiche sous le lien dans les résultats de recherche.
     const description = produit.description
       ? produit.description.slice(0, 300)
-      : `${produit.name} — livraison à Dakar, paiement à la livraison.`;
+      : `${produit.name} — livraison à Dakar, paiement par Wave ou Orange Money.`;
     const image = produit.images[0] ? urlAbsolue(produit.images[0]) : undefined;
     const url = `${SITE}/produit/${produit.slug}`;
 
@@ -195,7 +195,7 @@ function ProductPage() {
               </p>
               <p className="flex items-start gap-2">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={1.5} />
-                Paiement à la livraison — vous réglez après vérification.
+                Paiement par Wave ou Orange Money avant expédition.
               </p>
               <p>
                 Une question ?{" "}

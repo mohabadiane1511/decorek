@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.js";
+import { confirmerAdresse } from "./mailpit.js";
 
 /**
  * Le règlement précède la livraison.
@@ -102,4 +103,71 @@ test("une commande non annoncée reste en attente", async ({ page }) => {
   const commande = (await r.json()) as { status: string; paid: boolean };
   expect(commande.status).toBe("en_attente");
   expect(commande.paid).toBe(false);
+});
+
+test("le back-office montre le mode de règlement et rappelle de vérifier", async ({ page }) => {
+  const numero = await commander(page, "Wave");
+  await page.getByRole("link", { name: /J'ai payé/ }).click({ modifiers: ["Alt"] });
+  await expect(page.getByText(/joindre la capture/i)).toBeVisible({ timeout: 15_000 });
+
+  const adresse = `paiement-bo-${Date.now()}@decorek.sn`;
+  await page.goto("/compte");
+  await page.getByRole("button", { name: "Créer un compte" }).click();
+  await page.getByLabel("Nom complet").fill("Responsable");
+  await page.getByLabel("Email").fill(adresse);
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await confirmerAdresse(page, adresse);
+
+  const { execFileSync } = await import("node:child_process");
+  execFileSync("npm", ["run", "--prefix", "backend", "db:admin", "--", adresse], {
+    cwd: new URL("..", import.meta.url).pathname,
+    stdio: "pipe",
+    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "" },
+  });
+
+  await page.goto("/admin");
+  await page.getByRole("button", { name: "Commandes" }).click();
+  const carte = page.locator("article", { hasText: numero }).first();
+
+  await expect(carte).toContainText("Réglé par Wave", { timeout: 20_000 });
+  // Le rappel n'est pas décoratif : cocher sur la seule foi d'une capture revient à
+  // expédier sans avoir été payée.
+  await expect(carte).toContainText(/Vérifiez dans Wave avant d'expédier/);
+});
+
+test("les numéros de paiement se règlent depuis le back-office", async ({ page }) => {
+  const adresse = `paiement-cfg-${Date.now()}@decorek.sn`;
+  await page.goto("/compte");
+  await page.getByRole("button", { name: "Créer un compte" }).click();
+  await page.getByLabel("Nom complet").fill("Responsable");
+  await page.getByLabel("Email").fill(adresse);
+  await page.getByLabel("Mot de passe", { exact: true }).fill("motdepasse123");
+  await page.getByLabel("Confirmer le mot de passe").fill("motdepasse123");
+  await page.getByRole("button", { name: "Créer mon compte" }).click();
+  await confirmerAdresse(page, adresse);
+
+  const { execFileSync } = await import("node:child_process");
+  execFileSync("npm", ["run", "--prefix", "backend", "db:admin", "--", adresse], {
+    cwd: new URL("..", import.meta.url).pathname,
+    stdio: "pipe",
+    env: { ...process.env, DATABASE_URL: process.env["TEST_DATABASE_URL"] ?? "" },
+  });
+
+  await page.goto("/admin");
+  await page.getByRole("button", { name: "Contenu" }).click();
+  await expect(page.getByLabel("Numéro Wave")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByLabel("Numéro Orange Money")).toBeVisible();
+});
+
+test("le site n'annonce plus le paiement à la livraison", async ({ request }) => {
+  // Promettre un règlement à réception alors qu'on le demande d'avance ferait perdre
+  // la commande au moment de payer.
+  for (const chemin of ["/", "/boutique", "/livraison", "/cgv", "/llms.txt"]) {
+    const contenu = await (await request.get(chemin)).text();
+    expect(contenu, `${chemin} annonce encore le paiement à la livraison`).not.toMatch(
+      /paiement (uniquement )?à la livraison/i,
+    );
+  }
 });

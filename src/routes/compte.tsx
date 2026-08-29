@@ -453,7 +453,7 @@ function EspaceClient({ onDeconnexion }: { onDeconnexion: () => void }) {
                   <div className="text-right">
                     <p className="font-mono">{formatFcfa(o.total)}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {o.paid ? "Encaissée" : "À régler à la livraison"}
+                      {o.paid ? "Paiement vérifié" : "En attente de votre règlement"}
                     </p>
                   </div>
                 </div>

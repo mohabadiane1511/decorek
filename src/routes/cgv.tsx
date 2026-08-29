@@ -9,7 +9,7 @@ export const Route = createFileRoute("/cgv")({
       {
         name: "description",
         content:
-          "Conditions de vente Deco'Rek : prix en FCFA, paiement à la livraison, échanges sous 7 jours.",
+          "Conditions de vente Deco'Rek : prix en FCFA, paiement par Wave ou Orange Money, échanges sous 7 jours.",
       },
       { property: "og:title", content: "Conditions générales — Deco'Rek" },
       { property: "og:description", content: "Prix, paiement à la réception et échanges." },

@@ -76,13 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Vaisselle, décoration et mobilier de réception à Dakar. Paiement à la livraison, prix en FCFA.",
+          "Vaisselle, décoration et mobilier de réception à Dakar. Paiement par Wave ou Orange Money, prix en FCFA.",
       },
       { name: "author", content: "Deco'Rek" },
       { property: "og:title", content: "Deco'Rek — Vaisselle & décoration au Sénégal" },
       {
         property: "og:description",
-        content: "Vaisselle, décoration et mobilier de réception à Dakar. Paiement à la livraison.",
+        content:
+          "Vaisselle, décoration et mobilier de réception à Dakar. Paiement par Wave ou Orange Money.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

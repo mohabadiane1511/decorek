@@ -10,7 +10,7 @@ export const Route = createFileRoute("/livraison")({
       {
         name: "description",
         content:
-          "Zones et frais de livraison à Dakar, en banlieue et en régions. Paiement uniquement à la livraison.",
+          "Zones et frais de livraison à Dakar, en banlieue et en régions. Paiement par Wave ou Orange Money avant expédition.",
       },
       { property: "og:title", content: "Livraison & paiement — Deco'Rek" },
       {

@@ -416,9 +416,9 @@ export const seedContent: SiteContent = {
     contact:
       "Notre équipe vous répond du lundi au samedi, de 9h à 19h. Écrivez-nous sur WhatsApp pour une réponse immédiate, ou passez à la boutique de Sacré-Cœur 3 pour découvrir les pièces en vrai.",
     livraison:
-      "Nous livrons partout à Dakar en 24 à 48h et dans les régions sous 2 à 5 jours ouvrés. Les frais dépendent de votre quartier ou de votre région et s'affichent automatiquement au moment de la commande. Le paiement se fait uniquement à la livraison, en espèces ou par transfert mobile, après vérification de votre colis.",
+      "Nous livrons partout à Dakar en 24 à 48h et dans les régions sous 2 à 5 jours ouvrés. Les frais dépendent de votre quartier ou de votre région et s'affichent automatiquement au moment de la commande. Le règlement se fait avant l'expédition, par Wave ou Orange Money : après validation, vous recevez le numéro à créditer et vous nous transmettez votre reçu sur WhatsApp. Votre commande part dès que nous l'avons vérifié.",
     apropos:
       "Deco'Rek sélectionne des pièces de vaisselle, de décoration et de mobilier pour les intérieurs et les cérémonies au Sénégal. Chaque collection est choisie pour sa qualité, sa finition et sa capacité à sublimer un moment partagé.",
-    cgv: "Les prix sont affichés en FCFA, toutes taxes comprises. La commande est validée dès sa soumission ; le règlement s'effectue à la réception du colis. Tout article peut être échangé sous 7 jours s'il est retourné dans son emballage d'origine. Les commandes refusées à la livraison sans motif peuvent entraîner la demande d'un acompte pour les commandes suivantes.",
+    cgv: "Les prix sont affichés en FCFA, toutes taxes comprises. La commande est enregistrée dès sa soumission, puis préparée une fois le règlement reçu et vérifié. Le paiement s'effectue avant expédition, par Wave ou Orange Money, au numéro indiqué sur votre confirmation ; le reçu se transmet sur WhatsApp. Une commande sans règlement sous 48 heures peut être annulée et son stock remis en vente. Tout article peut être échangé sous 7 jours s'il est retourné dans son emballage d'origine.",
   },
 };

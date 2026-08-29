@@ -15,7 +15,7 @@ export const Route = createFileRoute("/confirmation/$number")({
       { title: "Commande confirmée | Deco'Rek" },
       {
         name: "description",
-        content: "Votre commande Deco'Rek est enregistrée. Paiement à la livraison.",
+        content: "Votre commande Deco'Rek est enregistrée. Réglez par Wave ou Orange Money.",
       },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Commande confirmée — Deco'Rek" },

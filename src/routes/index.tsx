@@ -14,12 +14,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Boutique sénégalaise de vaisselle, décoration et mobilier de réception. Prix en FCFA, livraison à Dakar et en régions, paiement à la livraison.",
+          "Boutique sénégalaise de vaisselle, décoration et mobilier de réception. Prix en FCFA, livraison à Dakar et en régions, paiement par Wave ou Orange Money.",
       },
       { property: "og:title", content: "Deco'Rek — Vaisselle, décoration & mobilier à Dakar" },
       {
         property: "og:description",
-        content: "L'art de recevoir, version sénégalaise. Paiement à la livraison.",
+        content: "L'art de recevoir, version sénégalaise. Paiement par Wave ou Orange Money.",
       },
       { property: "og:image", content: `${SITE_URL}${IMAGE_ACCUEIL}` },
       { property: "og:url", content: SITE_URL },

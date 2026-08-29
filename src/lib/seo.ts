@@ -48,7 +48,7 @@ export function boutiqueJsonLd(contact?: {
     "@type": "Store",
     name: "Deco'Rek",
     description:
-      "Vaisselle, décoration et mobilier de réception à Dakar. Paiement à la livraison, prix en FCFA.",
+      "Vaisselle, décoration et mobilier de réception à Dakar. Paiement par Wave ou Orange Money, prix en FCFA.",
     url: SITE,
     image: urlAbsolue("/images/logo-decorek.png"),
     // Le pays et la devise valent autant que l'adresse : ils disent à qui s'adresse la
@@ -61,7 +61,7 @@ export function boutiqueJsonLd(contact?: {
     },
     areaServed: { "@type": "Country", name: "Sénégal" },
     currenciesAccepted: "XOF",
-    paymentAccepted: "Espèces à la livraison",
+    paymentAccepted: "Wave, Orange Money",
     ...(contact?.telephone ? { telephone: contact.telephone } : {}),
     ...(contact?.email ? { email: contact.email } : {}),
   });

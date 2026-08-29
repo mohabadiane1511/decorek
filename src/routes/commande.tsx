@@ -24,7 +24,7 @@ export const Route = createFileRoute("/commande")({
       { property: "og:title", content: "Finaliser ma commande — Deco'Rek" },
       {
         property: "og:description",
-        content: "Livraison à Dakar et en régions, paiement à la livraison.",
+        content: "Livraison à Dakar et en régions, paiement par Wave ou Orange Money.",
       },
     ],
   }),

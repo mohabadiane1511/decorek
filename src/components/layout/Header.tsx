@@ -22,7 +22,9 @@ export function Header() {
     <header className="sticky top-0 z-40 bg-background">
       {barVisible && (
         <div className="relative bg-foreground px-10 py-2.5 text-center text-background">
-          <span className="label-mono">Paiement à la livraison · Dakar &amp; régions</span>
+          <span className="label-mono">
+            Wave &amp; Orange Money · Livraison Dakar &amp; régions
+          </span>
           <button
             onClick={() => setBarVisible(false)}
             aria-label="Fermer"
