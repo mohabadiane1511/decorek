@@ -29,3 +29,14 @@ for (const chemin of PAGES) {
     expect(erreurs, `erreurs relevées sur ${chemin}`).toEqual([]);
   });
 }
+
+test("aucune page publique n'annonce l'entrée du back-office", async ({ request }) => {
+  // L'administration n'a pas à être signalée aux visiteurs : elle reste protégée par
+  // l'authentification, mais afficher son adresse invite à s'y essayer.
+  for (const chemin of ["/", "/boutique", "/contact", "/livraison", "/cgv"]) {
+    const html = await (await request.get(chemin)).text();
+    expect(html, `${chemin} expose un lien vers l'administration`).not.toMatch(
+      /href="\/admin"|Espace administration/i,
+    );
+  }
+});

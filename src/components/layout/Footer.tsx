@@ -109,11 +109,6 @@ export function Footer() {
                 Confidentialité
               </Link>
             </li>
-            <li>
-              <Link to="/admin" className="hover:text-background">
-                Espace administration
-              </Link>
-            </li>
           </ul>
         </div>
         <div>
