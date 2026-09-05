@@ -1,0 +1,102 @@
+# Mise en production derrière Traefik.
+#
+# À lancer avec le fichier de base, sans celui de développement :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Le fichier de base n'ouvre aucun port : base de données, cache, stockage et
+# messagerie restent invisibles depuis Internet et ne se joignent que par le réseau
+# interne. Seul Traefik est exposé, et il ne voit que ce qui porte une étiquette.
+#
+# Les noms d'entrée et de résolveur varient d'une installation de Traefik à l'autre :
+# ils sont ici des variables, à renseigner dans .env plutôt qu'à chercher dans ce
+# fichier. Une étiquette qui nomme une entrée inexistante est ignorée en silence, et le
+# site reste injoignable sans qu'aucune erreur ne le dise.
+
+networks:
+  # Réseau où vit Traefik. Déclaré externe : il est créé par son installation, pas par
+  # ce projet, et le recréer ici couperait le proxy des autres conteneurs.
+  proxy:
+    external: true
+    name: ${TRAEFIK_RESEAU:-traefik_default}
+
+services:
+  site:
+    networks: [default, proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_RESEAU:-traefik_default}
+
+      # Le site répond à tout ce que les autres routeurs n'ont pas pris. Sa priorité
+      # basse le place après eux : sans cela il capterait aussi /api.
+      traefik.http.routers.decorek-site.rule: Host(`${SITE_DOMAINE:-deco-rek.com}`)
+      traefik.http.routers.decorek-site.priority: "1"
+      traefik.http.routers.decorek-site.entrypoints: ${TRAEFIK_ENTREE:-websecure}
+      traefik.http.routers.decorek-site.tls.certresolver: ${TRAEFIK_RESOLVEUR:-letsencrypt}
+      traefik.http.routers.decorek-site.middlewares: decorek-securite
+      traefik.http.services.decorek-site.loadbalancer.server.port: "3000"
+
+      # En-têtes de sécurité, posés une fois et réutilisés par les autres routeurs.
+      # Le navigateur ne devine pas le type d'un fichier, la page ne s'affiche pas dans
+      # un cadre étranger, et le référent ne fuite pas vers les sites tiers.
+      traefik.http.middlewares.decorek-securite.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.decorek-securite.headers.frameDeny: "true"
+      traefik.http.middlewares.decorek-securite.headers.referrerPolicy: strict-origin-when-cross-origin
+      traefik.http.middlewares.decorek-securite.headers.stsSeconds: "31536000"
+      traefik.http.middlewares.decorek-securite.headers.stsIncludeSubdomains: "true"
+
+  api:
+    networks: [default, proxy]
+    # Les dépendances se cumulent d'un fichier à l'autre : « !reset » efface celles du
+    # fichier de base avant de reposer les bonnes, sans la messagerie de développement.
+    # Les dépendances se cumulent d'un fichier à l'autre : « !override » remplace la
+    # liste du fichier de base au lieu de s'y ajouter, ce qui écarte la messagerie de
+    # développement sans la laisser bloquer le démarrage.
+    depends_on: !override
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    environment:
+      # Adresse publique : les liens des e-mails et les URL signées du stockage
+      # partent d'ici, jamais d'un nom de conteneur que personne ne peut joindre.
+      AUTH_URL: https://${SITE_DOMAINE:-deco-rek.com}
+      SITE_URL: https://${SITE_DOMAINE:-deco-rek.com}
+      S3_PUBLIC_ENDPOINT: https://${SITE_DOMAINE:-deco-rek.com}
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_RESEAU:-traefik_default}
+
+      # L'API et le plan du site passent avant la règle générale du site.
+      traefik.http.routers.decorek-api.rule: Host(`${SITE_DOMAINE:-deco-rek.com}`) && (PathPrefix(`/api`) || Path(`/sitemap.xml`))
+      traefik.http.routers.decorek-api.priority: "10"
+      traefik.http.routers.decorek-api.entrypoints: ${TRAEFIK_ENTREE:-websecure}
+      traefik.http.routers.decorek-api.tls.certresolver: ${TRAEFIK_RESOLVEUR:-letsencrypt}
+      traefik.http.routers.decorek-api.middlewares: decorek-securite
+      traefik.http.services.decorek-api.loadbalancer.server.port: "3000"
+
+  storage:
+    networks: [default, proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_RESEAU:-traefik_default}
+
+      # Les images sont servies sous /media, jamais depuis l'adresse du stockage :
+      # celle-ci resterait à ouvrir sur Internet, avec sa console d'administration.
+      traefik.http.routers.decorek-media.rule: Host(`${SITE_DOMAINE:-deco-rek.com}`) && PathPrefix(`/media`)
+      traefik.http.routers.decorek-media.priority: "10"
+      traefik.http.routers.decorek-media.entrypoints: ${TRAEFIK_ENTREE:-websecure}
+      traefik.http.routers.decorek-media.tls.certresolver: ${TRAEFIK_RESOLVEUR:-letsencrypt}
+      traefik.http.routers.decorek-media.middlewares: decorek-media-chemin,decorek-securite
+      traefik.http.services.decorek-media.loadbalancer.server.port: "9000"
+
+      # /media/photo.jpg devient /decorek-media/photo.jpg : le seau n'apparaît pas dans
+      # les adresses publiques, et en changer ne casse aucun lien déjà partagé.
+      traefik.http.middlewares.decorek-media-chemin.replacepathregex.regex: ^/media/(.*)
+      traefik.http.middlewares.decorek-media-chemin.replacepathregex.replacement: /${MINIO_BUCKET:-decorek-media}/$$1
+
+  # La messagerie de développement n'a rien à faire en production : les e-mails partent
+  # par le fournisseur configuré dans .env.
+  mail:
+    profiles: [developpement]
