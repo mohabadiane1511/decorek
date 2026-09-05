@@ -3,22 +3,29 @@
 Le serveur exécute déjà Traefik, installé avec le VPS. Ce document décrit ce qu'il
 reste à faire pour y poser Deco'Rek.
 
-## 1. Relever les réglages de Traefik
+## 1. Le Traefik du VPS
 
-Trois noms varient d'une installation à l'autre et doivent être exacts : une étiquette
-qui désigne une entrée inexistante est **ignorée en silence**, et le site reste
-injoignable sans qu'aucune erreur ne l'explique.
+Relevé sur la machine, il tourne en mode réseau **host** : il partage la pile réseau du
+serveur et joint les conteneurs par leur adresse interne. Aucun réseau partagé à créer.
+
+Ses réglages, à confirmer après toute réinstallation :
 
 ```sh
-# Nom du réseau où vit Traefik
-docker inspect traefik-traefik-1 --format '{{json .NetworkSettings.Networks}}'
-
-# Entrées (« websecure », « https »…) et résolveur de certificats
 docker inspect traefik-traefik-1 --format '{{join .Config.Cmd "\n"}}'
 ```
 
-Reporter ces valeurs dans `.env` : `TRAEFIK_RESEAU`, `TRAEFIK_ENTREE`,
-`TRAEFIK_RESOLVEUR`.
+Ce qui a été trouvé, et qui figure dans `.env.example` :
+
+- entrées `web` (port 80) et `websecure` (port 443) ;
+- résolveur de certificats `letsencrypt`, par défi HTTP sur l'entrée `web` — le port 80
+  doit donc rester ouvert, sans quoi aucun certificat ne sera délivré ;
+- redirection du port 80 vers le 443 **déjà configurée**, inutile de la refaire ;
+- `exposedbydefault=false` : seuls les conteneurs portant `traefik.enable=true` sont
+  publiés, ce qui laisse base, cache et stockage hors d'atteinte.
+
+`TRAEFIK_RESEAU` désigne le réseau du projet, non celui de Traefik : Compose le nomme
+d'après le dossier, donc `decorek_default` si le dépôt est cloné dans `decorek`. Le
+vérifier après le premier démarrage avec `docker network ls`.
 
 ## 2. Préparer le fichier .env
 

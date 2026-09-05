@@ -7,24 +7,23 @@
 # messagerie restent invisibles depuis Internet et ne se joignent que par le réseau
 # interne. Seul Traefik est exposé, et il ne voit que ce qui porte une étiquette.
 #
-# Les noms d'entrée et de résolveur varient d'une installation de Traefik à l'autre :
-# ils sont ici des variables, à renseigner dans .env plutôt qu'à chercher dans ce
-# fichier. Une étiquette qui nomme une entrée inexistante est ignorée en silence, et le
-# site reste injoignable sans qu'aucune erreur ne le dise.
-
-networks:
-  # Réseau où vit Traefik. Déclaré externe : il est créé par son installation, pas par
-  # ce projet, et le recréer ici couperait le proxy des autres conteneurs.
-  proxy:
-    external: true
-    name: ${TRAEFIK_RESEAU:-traefik_default}
+# Le Traefik du VPS tourne en mode réseau « host » : il partage la pile réseau de la
+# machine et joint les conteneurs par leur adresse interne, sans réseau partagé. Rien à
+# créer ni à raccorder donc — il suffit de lui désigner le réseau du projet, faute de
+# quoi il devrait deviner lequel utiliser.
+#
+# Il n'expose que ce qui porte `traefik.enable=true` (exposedbydefault=false), et
+# redirige déjà le port 80 vers le 443 : inutile de le refaire ici.
+#
+# Les noms d'entrée et de résolveur restent des variables : une étiquette qui nomme une
+# entrée inexistante est ignorée en silence, et le site resterait injoignable sans
+# qu'aucune erreur ne le dise.
 
 services:
   site:
-    networks: [default, proxy]
     labels:
       traefik.enable: "true"
-      traefik.docker.network: ${TRAEFIK_RESEAU:-traefik_default}
+      traefik.docker.network: ${TRAEFIK_RESEAU:-decorek_default}
 
       # Le site répond à tout ce que les autres routeurs n'ont pas pris. Sa priorité
       # basse le place après eux : sans cela il capterait aussi /api.
@@ -45,7 +44,6 @@ services:
       traefik.http.middlewares.decorek-securite.headers.stsIncludeSubdomains: "true"
 
   api:
-    networks: [default, proxy]
     # Les dépendances se cumulent d'un fichier à l'autre : « !reset » efface celles du
     # fichier de base avant de reposer les bonnes, sans la messagerie de développement.
     # Les dépendances se cumulent d'un fichier à l'autre : « !override » remplace la
@@ -66,7 +64,7 @@ services:
       S3_PUBLIC_ENDPOINT: https://${SITE_DOMAINE:-deco-rek.com}
     labels:
       traefik.enable: "true"
-      traefik.docker.network: ${TRAEFIK_RESEAU:-traefik_default}
+      traefik.docker.network: ${TRAEFIK_RESEAU:-decorek_default}
 
       # L'API et le plan du site passent avant la règle générale du site.
       traefik.http.routers.decorek-api.rule: Host(`${SITE_DOMAINE:-deco-rek.com}`) && (PathPrefix(`/api`) || Path(`/sitemap.xml`))
@@ -77,10 +75,9 @@ services:
       traefik.http.services.decorek-api.loadbalancer.server.port: "3000"
 
   storage:
-    networks: [default, proxy]
     labels:
       traefik.enable: "true"
-      traefik.docker.network: ${TRAEFIK_RESEAU:-traefik_default}
+      traefik.docker.network: ${TRAEFIK_RESEAU:-decorek_default}
 
       # Les images sont servies sous /media, jamais depuis l'adresse du stockage :
       # celle-ci resterait à ouvrir sur Internet, avec sa console d'administration.
