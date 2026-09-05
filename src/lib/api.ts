@@ -33,6 +33,40 @@ function urlComplete(chemin: string): string {
   return `${origine}${chemin}`;
 }
 
+/**
+ * Traduit le détail d'un refus de validation en une phrase utile.
+ *
+ * Le serveur dit précisément quel champ ne va pas ; sans cette lecture, l'écran
+ * n'affichait que « Données invalides. » — une cliente ne pouvait pas savoir quoi
+ * corriger, et abandonnait sa commande.
+ */
+function messageDeValidation(details: unknown): string | undefined {
+  if (!Array.isArray(details) || details.length === 0) return undefined;
+  const premier = details[0] as { path?: unknown[]; message?: string };
+  const chemin = Array.isArray(premier.path) ? premier.path : [];
+
+  // Le nom technique du champ ne parle à personne : on donne celui de l'écran.
+  const libelles: Record<string, string> = {
+    name: "le nom",
+    phone: "le téléphone",
+    email: "l'adresse e-mail",
+    address: "l'adresse de livraison",
+    areaId: "la zone de livraison",
+    note: "les indications de livraison",
+    paymentMethod: "le mode de paiement",
+    items: "le panier",
+    quantity: "la quantité",
+    promoCode: "le code promo",
+  };
+  const champ = chemin
+    .map((segment) => (typeof segment === "string" ? libelles[segment] : undefined))
+    .filter((libelle): libelle is string => libelle !== undefined)
+    .pop();
+
+  const raison = premier.message ?? "valeur incorrecte";
+  return champ ? `Vérifiez ${champ} : ${raison.toLowerCase()}.` : undefined;
+}
+
 export class ErreurApi extends Error {
   constructor(
     message: string,
@@ -61,8 +95,11 @@ async function envoyer<T>(chemin: string, corps: unknown): Promise<T> {
   }
 
   if (!reponse.ok) {
-    let details: { error?: { message?: string; code?: string }; message?: string; code?: string } =
-      {};
+    let details: {
+      error?: { message?: string; code?: string; details?: unknown };
+      message?: string;
+      code?: string;
+    } = {};
     try {
       details = (await reponse.json()) as typeof details;
     } catch {
@@ -81,6 +118,9 @@ async function envoyer<T>(chemin: string, corps: unknown): Promise<T> {
     const codeAuth = (details as { code?: string }).code;
     const message =
       (codeAuth ? traductions[codeAuth] : undefined) ??
+      // Le champ fautif d'abord, quand le serveur l'indique : il vaut mieux que le
+      // message générique qui l'accompagne.
+      messageDeValidation(details.error?.details) ??
       details.error?.message ??
       details.message ??
       (reponse.status === 429

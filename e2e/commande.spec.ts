@@ -110,3 +110,21 @@ test("une remise sous le minimum requis est refusée avec son motif", async ({ p
 
   await expect(page.getByText(/à partir de/i)).toBeVisible({ timeout: 15_000 });
 });
+
+test("un champ mal rempli est nommé, pas seulement refusé", async ({ page }) => {
+  await page.goto("/produit/sous-assiette-solaire-doree");
+  await page.getByRole("button", { name: "Ajouter au panier" }).first().click();
+  await expect(page.locator("[data-sonner-toast]")).toBeVisible({ timeout: 10_000 });
+
+  await page.goto("/commande");
+  await page.getByLabel("Nom complet *").fill("Awa Diop");
+  // Trop court pour le serveur, assez long pour passer le contrôle du formulaire.
+  await page.getByLabel("Téléphone *").fill("77");
+  await page.getByLabel("Adresse précise *").fill("Route des Almadies, villa 12");
+  await page.getByRole("button", { name: /Valider ma commande/ }).click();
+
+  // « Données invalides » ne dit pas quoi corriger : une cliente abandonne sa commande
+  // faute de savoir quel champ reprendre.
+  const message = page.locator("[data-sonner-toast]").last();
+  await expect(message).toContainText(/téléphone/i, { timeout: 15_000 });
+});
