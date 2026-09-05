@@ -21,6 +21,11 @@ RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma gene
 # vérifier que les réponses de l'API respectent le contrat.
 COPY src/data /depot/src/data
 
+# Photos du catalogue de démonstration, lues par l'amorçage pour les envoyer au
+# stockage. Elles ne servent qu'à cette étape, jamais à l'exécution de l'API : elles
+# restent donc dans l'étape de construction, d'où partent les commandes d'exploitation.
+COPY public/images /depot/public/images
+
 COPY backend/tsconfig.json backend/tsconfig.build.json ./
 COPY backend/src ./src
 RUN npx tsc -p tsconfig.build.json
