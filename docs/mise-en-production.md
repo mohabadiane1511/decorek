@@ -15,7 +15,7 @@ réussi. Sous Linux, le silence est bon signe. C'est quand un texte rouge ou le 
 2. [Savoir se déplacer](#2-savoir-se-déplacer)
 3. [Ouvrir et modifier un fichier](#3-ouvrir-et-modifier-un-fichier)
 4. [Remplir le fichier .env](#4-remplir-le-fichier-env)
-5. [Vérifier le nom de domaine](#5-vérifier-le-nom-de-domaine)
+5. [Faire pointer le domaine sur le VPS](#5-faire-pointer-le-domaine-sur-le-vps)
 6. [Démarrer le site](#6-démarrer-le-site)
 7. [Préparer la base de données](#7-préparer-la-base-de-données)
 8. [Créer votre compte d'administration](#8-créer-votre-compte-dadministration)
@@ -178,34 +178,74 @@ ligne importante ne finit par `=` tout seul.
 
 ---
 
-## 5. Vérifier le nom de domaine
+## 5. Faire pointer le domaine sur le VPS
 
-Le certificat HTTPS ne peut être obtenu que si `deco-rek.com` pointe déjà sur votre
-serveur.
+Un nom de domaine acheté chez Hostinger ne pointe pas sur votre VPS par défaut : il
+mène à une page d'attente, sur une autre machine. Tant que ce n'est pas corrigé, rien
+ne peut fonctionner — Let's Encrypt irait vérifier le mauvais serveur et refuserait de
+délivrer le certificat.
 
-Connaître l'adresse du serveur. Le `-4` compte : votre VPS a deux adresses, une IPv4 et
-une IPv6, et sans cette option il répond souvent l'IPv6 — que vous compareriez alors à
-une IPv4, en croyant à tort qu'elles ne correspondent pas.
+### Relever l'adresse de votre VPS
+
+Sur le serveur :
 
 ```sh
 curl -4 -s ifconfig.me
 ```
 
-Vérifier où pointe le domaine :
+Le `-4` compte : votre VPS a deux adresses, une IPv4 et une IPv6. Sans cette option, la
+commande répond souvent l'IPv6, que vous compareriez à une IPv4 — et vous concluriez à
+tort que le DNS est mal réglé.
+
+Notez l'adresse obtenue, du type `72.62.30.119`. C'est elle qu'il faut déclarer.
+
+### Modifier la zone DNS chez Hostinger
+
+1. Connectez-vous à **hPanel** sur <https://hpanel.hostinger.com>
+2. Ouvrez la section **Domaines**, puis `deco-rek.com`
+3. Cherchez **Zone DNS** (ou « DNS / Nameservers » selon la langue de l'interface)
+
+Vous voyez une liste d'enregistrements. Deux vous concernent, tous deux de **type A** :
+
+| Nom | Pointe vers | À faire |
+|---|---|---|
+| `@` | une adresse qui n'est pas la vôtre | La remplacer par l'adresse du VPS |
+| `www` | idem, ou absent | Même adresse que `@` |
+
+Le `@` désigne le domaine nu, `deco-rek.com`. Le `www` désigne `www.deco-rek.com`.
+
+**Modifiez l'enregistrement existant plutôt que d'en ajouter un second.** Deux
+enregistrements A sur le même nom enverraient les visiteurs tantôt sur un serveur,
+tantôt sur l'autre — et le site paraîtrait fonctionner une fois sur deux.
+
+Si un champ **TTL** est proposé, mettez la plus petite valeur offerte (souvent 300
+secondes) le temps de la mise en route : les corrections seront prises en compte plus
+vite.
+
+### Vérifier les serveurs de noms
+
+Toujours dans la fiche du domaine, vérifiez que les **serveurs de noms** (nameservers)
+sont bien ceux d'Hostinger, du type `ns1.dns-parking.com`. S'ils pointent ailleurs, la
+zone DNS que vous venez de modifier n'est pas celle qui fait autorité, et votre
+changement n'aura aucun effet.
+
+### Attendre, puis contrôler
+
+La propagation prend de quelques minutes à quelques heures. Contrôlez depuis le
+serveur :
 
 ```sh
 dig +short deco-rek.com
 ```
 
-**Ces deux commandes doivent afficher la même adresse**, du type `2.57.91.91`.
+**Cette adresse doit être exactement celle donnée par `curl -4 -s ifconfig.me`.**
 
-Si `dig` ne répond rien, le domaine n'est pas encore configuré : allez dans la zone DNS
-de votre registraire et créez un enregistrement de type **A** pointant `deco-rek.com`
-vers l'adresse du VPS. Comptez de quelques minutes à quelques heures avant que ce soit
-pris en compte partout.
+Tant qu'elles diffèrent, ne passez pas à la suite : Let's Encrypt validerait un serveur
+qui n'est pas le vôtre, aucun certificat ne serait délivré, et le site s'afficherait
+avec un avertissement de sécurité.
 
-Ne passez pas à la suite tant que ces deux adresses diffèrent : Let's Encrypt refuserait
-de délivrer le certificat, et le site s'afficherait avec un avertissement de sécurité.
+Si `dig` ne répond rien du tout, c'est que l'enregistrement n'existe pas encore, ou que
+la propagation n'est pas terminée. Patientez et réessayez.
 
 Si vous voulez aussi que le domaine réponde en IPv6, ajoutez un enregistrement **AAAA**
 pointant vers l'adresse donnée par `curl -6 -s ifconfig.me`. Ce n'est pas nécessaire au
