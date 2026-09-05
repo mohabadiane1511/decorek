@@ -105,15 +105,28 @@ GitHub : il n'existe que sur ce serveur.
 
 ### Générer les mots de passe
 
-Ne réutilisez pas ceux du développement : ils sont visibles dans le dépôt. Générez-en
-de nouveaux, un par ligne :
+Ne réutilisez pas ceux du développement : ils sont visibles dans le dépôt.
+
+**Deux commandes différentes, et l'erreur coûte cher.** Les mots de passe de la base, du
+cache et du stockage voyagent dans des adresses de connexion du type
+`redis://:motdepasse@cache:6379`. Un mot de passe contenant `/`, `+` ou `=` casse cette
+adresse, et le service refuse de démarrer avec un message `Invalid URL` peu parlant.
+
+Pour ces trois-là, une forme hexadécimale, qui ne contient que des chiffres et des
+lettres :
+
+```sh
+openssl rand -hex 24
+```
+
+Lancez-la **trois fois** : une valeur pour `POSTGRES_PASSWORD`, une pour
+`REDIS_PASSWORD`, une pour `MINIO_ROOT_PASSWORD`.
+
+Pour `AUTH_SECRET`, qui ne va dans aucune adresse, la forme habituelle convient :
 
 ```sh
 openssl rand -base64 32
 ```
-
-Lancez cette commande **cinq fois** et gardez les cinq résultats sous la main — un pour
-chaque mot de passe ci-dessous. Vous pouvez les copier-coller depuis le terminal.
 
 ### Ouvrir le fichier
 
@@ -127,10 +140,10 @@ Cherchez chaque ligne et remplacez ce qui suit le signe `=`. **Pas d'espace auto
 `=`, pas de guillemets.**
 
 ```
-POSTGRES_PASSWORD=collez-ici-le-premier-mot-de-passe
-REDIS_PASSWORD=collez-ici-le-deuxième
-MINIO_ROOT_PASSWORD=collez-ici-le-troisième
-AUTH_SECRET=collez-ici-le-quatrième
+POSTGRES_PASSWORD=collez-ici-une-valeur-hexadécimale
+REDIS_PASSWORD=collez-ici-la-deuxième-hexadécimale
+MINIO_ROOT_PASSWORD=collez-ici-la-troisième-hexadécimale
+AUTH_SECRET=collez-ici-la-valeur-base64
 ```
 
 Puis la partie production :
@@ -491,8 +504,21 @@ Le certificat peut mettre une minute à être délivré après le premier démar
 
 ### Un service redémarre en boucle
 
-Presque toujours un `.env` incomplet. Regardez ses journaux : le message dit
-généralement quelle variable manque.
+Presque toujours un `.env` incomplet ou mal formé. Regardez ses journaux : le message
+dit généralement quelle variable manque.
+
+Si vous lisez `TypeError: Invalid URL` avec une adresse de type
+`redis://:...@cache:6379`, c'est qu'un mot de passe contient `/`, `+` ou `=`.
+Régénérez-le avec `openssl rand -hex 24`, corrigez `.env`, puis repartez de zéro — la
+base a été créée avec l'ancien mot de passe :
+
+```sh
+dc down -v
+dc up -d --build
+```
+
+Le `-v` efface les volumes. Il n'est sans danger que **tant que la boutique n'a aucune
+donnée réelle**. Passé la mise en service, cette commande détruirait tout.
 
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 30 api
