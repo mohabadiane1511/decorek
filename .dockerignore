@@ -9,9 +9,8 @@ backend/src/generated
 .wrangler
 dist
 
-# Le front n'entre pas dans l'image de l'API ; seul src/data (le contrat de données)
-# est copié explicitement par le Dockerfile.
-public
+# `public` reste dans le contexte : l'image du site en a besoin. L'image de l'API ne le
+# copie pas, chaque Dockerfile ne prenant que ce qui le concerne.
 e2e
 test-results
 playwright-report
