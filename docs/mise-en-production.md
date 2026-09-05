@@ -183,10 +183,12 @@ ligne importante ne finit par `=` tout seul.
 Le certificat HTTPS ne peut être obtenu que si `deco-rek.com` pointe déjà sur votre
 serveur.
 
-Connaître l'adresse du serveur :
+Connaître l'adresse du serveur. Le `-4` compte : votre VPS a deux adresses, une IPv4 et
+une IPv6, et sans cette option il répond souvent l'IPv6 — que vous compareriez alors à
+une IPv4, en croyant à tort qu'elles ne correspondent pas.
 
 ```sh
-curl -s ifconfig.me
+curl -4 -s ifconfig.me
 ```
 
 Vérifier où pointe le domaine :
@@ -195,13 +197,19 @@ Vérifier où pointe le domaine :
 dig +short deco-rek.com
 ```
 
-**Les deux commandes doivent afficher la même adresse.** Si la seconde ne répond rien,
-le domaine n'est pas encore configuré : allez dans la zone DNS de votre registraire et
-créez un enregistrement de type **A** pointant `deco-rek.com` vers l'adresse du VPS.
-Comptez de quelques minutes à quelques heures pour que ce soit pris en compte.
+**Ces deux commandes doivent afficher la même adresse**, du type `2.57.91.91`.
+
+Si `dig` ne répond rien, le domaine n'est pas encore configuré : allez dans la zone DNS
+de votre registraire et créez un enregistrement de type **A** pointant `deco-rek.com`
+vers l'adresse du VPS. Comptez de quelques minutes à quelques heures avant que ce soit
+pris en compte partout.
 
 Ne passez pas à la suite tant que ces deux adresses diffèrent : Let's Encrypt refuserait
 de délivrer le certificat, et le site s'afficherait avec un avertissement de sécurité.
+
+Si vous voulez aussi que le domaine réponde en IPv6, ajoutez un enregistrement **AAAA**
+pointant vers l'adresse donnée par `curl -6 -s ifconfig.me`. Ce n'est pas nécessaire au
+fonctionnement du site.
 
 ---
 
