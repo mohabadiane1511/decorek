@@ -25,13 +25,13 @@ organisateurs de cérémonies — mariages, baptêmes, réceptions.
 
 ## Pages
 
-- [Boutique](https://decorek.sn/boutique) : catalogue complet, filtrable par catégorie
+- [Boutique](https://deco-rek.com/boutique) : catalogue complet, filtrable par catégorie
   et par prix. Chaque article y porte son prix, son stock et ses photos.
-- [Livraison](https://decorek.sn/livraison) : zones desservies, frais et délais.
-- [À propos](https://decorek.sn/a-propos) : présentation de la boutique.
-- [Contact](https://decorek.sn/contact) : téléphone, WhatsApp et adresse.
-- [Conditions générales de vente](https://decorek.sn/cgv)
-- [Confidentialité](https://decorek.sn/confidentialite)
+- [Livraison](https://deco-rek.com/livraison) : zones desservies, frais et délais.
+- [À propos](https://deco-rek.com/a-propos) : présentation de la boutique.
+- [Contact](https://deco-rek.com/contact) : téléphone, WhatsApp et adresse.
+- [Conditions générales de vente](https://deco-rek.com/cgv)
+- [Confidentialité](https://deco-rek.com/confidentialite)
 
 ## Données structurées
 
@@ -40,5 +40,5 @@ nom, référence, description, photos, prix en XOF et disponibilité réelle. Ce
 suivent la base de la boutique — un article annoncé disponible l'est effectivement au
 moment de la lecture.
 
-Le plan du site est disponible à https://decorek.sn/sitemap.xml et recense toutes les
+Le plan du site est disponible à https://deco-rek.com/sitemap.xml et recense toutes les
 fiches produits.

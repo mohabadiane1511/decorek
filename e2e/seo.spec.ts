@@ -98,7 +98,7 @@ test("le plan du site recense les articles et se met à jour tout seul", async (
   // Les pages de gestion et d'achat n'ont rien à faire dans un plan de site.
   for (const interdit of ["/admin", "/panier", "/commande", "/compte"]) {
     expect(xml, `${interdit} ne doit pas être proposé à l'indexation`).not.toContain(
-      `<loc>https://decorek.sn${interdit}</loc>`,
+      `<loc>https://deco-rek.com${interdit}</loc>`,
     );
   }
 });

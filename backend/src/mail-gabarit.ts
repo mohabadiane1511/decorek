@@ -65,7 +65,7 @@ function versTexte(m: Message): string {
     "",
     "—",
     "Deco'Rek — Dakar, Sénégal",
-    "Vous recevez ce message suite à une action effectuée avec votre adresse sur decorek.sn.",
+    "Vous recevez ce message suite à une action effectuée avec votre adresse sur deco-rek.com.",
   );
   return morceaux.join("\n");
 }
@@ -147,7 +147,7 @@ function versHtml(m: Message): string {
         <tr><td style="padding:0 32px 32px">
           <p style="font-family:${PILE};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${GRIS};margin:0 0 8px">Deco'Rek — Dakar, Sénégal</p>
           <p style="font-family:${PILE};font-size:12px;line-height:1.6;color:${GRIS};margin:0">
-            Vous recevez ce message suite à une action effectuée avec votre adresse sur decorek.sn.
+            Vous recevez ce message suite à une action effectuée avec votre adresse sur deco-rek.com.
             Si vous n'en êtes pas à l'origine, ignorez simplement cet e-mail.
           </p>
         </td></tr>

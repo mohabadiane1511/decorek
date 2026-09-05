@@ -8,7 +8,7 @@ import { creerClient } from "../src/db.js";
  * serveur. Aucune inscription ne peut le donner, et aucune adresse ne le confère : c'est
  * ce qui remplace la règle de la maquette où « admin@… » suffisait.
  *
- * Usage : npm run db:admin -- contact@decorek.sn
+ * Usage : npm run db:admin -- contact@deco-rek.com
  */
 loadEnv({ path: new URL("../.env", import.meta.url).pathname, quiet: true });
 

@@ -40,4 +40,4 @@ Allow: /
 User-agent: Applebot-Extended
 Allow: /
 
-Sitemap: https://decorek.sn/sitemap.xml
+Sitemap: https://deco-rek.com/sitemap.xml

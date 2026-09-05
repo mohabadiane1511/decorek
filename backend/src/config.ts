@@ -13,7 +13,7 @@ const schemaConfig = z.object({
   AUTH_URL: z.string().min(1).default("http://localhost:8080"),
   // Adresse publique du site, utilisée par le plan du site et les liens des
   // e-mails. Distincte de AUTH_URL, qui désigne l'API.
-  SITE_URL: z.string().min(1).default("https://decorek.sn"),
+  SITE_URL: z.string().min(1).default("https://deco-rek.com"),
   // Tentatives de connexion tolérées par minute et par adresse IP. Relevé uniquement
   // pour l'instance dédiée aux tests, qui en émet beaucoup depuis une seule adresse ;
   // la valeur de production reste celle par défaut.
@@ -28,7 +28,7 @@ const schemaConfig = z.object({
     .default(false),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  MAIL_FROM: z.string().min(1).default("Deco'Rek <contact@decorek.sn>"),
+  MAIL_FROM: z.string().min(1).default("Deco'Rek <contact@deco-rek.com>"),
 
   S3_ENDPOINT: z.string().min(1),
   S3_ACCESS_KEY: z.string().min(1),
