@@ -97,3 +97,37 @@ services:
   # par le fournisseur configuré dans .env.
   mail:
     profiles: [developpement]
+
+  # Commandes d'exploitation : appliquer les migrations, installer le catalogue de
+  # départ, promouvoir un compte en administrateur.
+  #
+  # Elles s'appuient sur l'étape de construction de l'image, qui contient le code source
+  # et les outils de développement. L'image finale, elle, en est volontairement dépourvue
+  # — elle n'a qu'à servir le site, et tout ce qu'on y ajoute est une surface de plus.
+  #
+  # Ce service ne démarre jamais tout seul : son profil le réserve à un appel explicite.
+  #
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  #     run --rm outils npm run db:seed
+  outils:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: build
+    profiles: [outils]
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@cache:6379
+      AUTH_SECRET: ${AUTH_SECRET}
+      S3_ENDPOINT: http://storage:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${MINIO_BUCKET:-decorek-media}
+      S3_PUBLIC_ENDPOINT: https://${SITE_DOMAINE:-deco-rek.com}
+      MEDIA_PREFIX: /media
+    command: ["true"]

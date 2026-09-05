@@ -1,85 +1,478 @@
-# Mise en production sur le VPS
+# Mettre Deco'Rek en ligne, pas à pas
 
-Le serveur exécute déjà Traefik, installé avec le VPS. Ce document décrit ce qu'il
-reste à faire pour y poser Deco'Rek.
+Ce document part du principe que vous n'utilisez pas Linux au quotidien. Chaque
+commande est expliquée, avec ce que vous devez voir à l'écran quand elle réussit.
 
-## 1. Le Traefik du VPS
+**Une règle avant de commencer :** une commande qui ne renvoie rien a généralement
+réussi. Sous Linux, le silence est bon signe. C'est quand un texte rouge ou le mot
+`error` apparaît qu'il faut s'arrêter et lire.
 
-Relevé sur la machine, il tourne en mode réseau **host** : il partage la pile réseau du
-serveur et joint les conteneurs par leur adresse interne. Aucun réseau partagé à créer.
+---
 
-Ses réglages, à confirmer après toute réinstallation :
+## Sommaire
+
+1. [Se connecter au serveur](#1-se-connecter-au-serveur)
+2. [Savoir se déplacer](#2-savoir-se-déplacer)
+3. [Ouvrir et modifier un fichier](#3-ouvrir-et-modifier-un-fichier)
+4. [Remplir le fichier .env](#4-remplir-le-fichier-env)
+5. [Vérifier le nom de domaine](#5-vérifier-le-nom-de-domaine)
+6. [Démarrer le site](#6-démarrer-le-site)
+7. [Préparer la base de données](#7-préparer-la-base-de-données)
+8. [Créer votre compte d'administration](#8-créer-votre-compte-dadministration)
+9. [Vérifier que tout marche](#9-vérifier-que-tout-marche)
+10. [Les réglages à faire dans le back-office](#10-les-réglages-à-faire-dans-le-back-office)
+11. [Mettre à jour le site plus tard](#11-mettre-à-jour-le-site-plus-tard)
+12. [Quand ça ne marche pas](#12-quand-ça-ne-marche-pas)
+
+---
+
+## 1. Se connecter au serveur
+
+Depuis le terminal de votre Mac :
 
 ```sh
-docker inspect traefik-traefik-1 --format '{{join .Config.Cmd "\n"}}'
+ssh root@ADRESSE_IP_DU_VPS
 ```
 
-Ce qui a été trouvé, et qui figure dans `.env.example` :
+Remplacez `ADRESSE_IP_DU_VPS` par l'adresse donnée par Hostinger. Vous pouvez aussi
+passer par la console web de Hostinger, comme vous l'avez fait jusqu'ici.
 
-- entrées `web` (port 80) et `websecure` (port 443) ;
-- résolveur de certificats `letsencrypt`, par défi HTTP sur l'entrée `web` — le port 80
-  doit donc rester ouvert, sans quoi aucun certificat ne sera délivré ;
-- redirection du port 80 vers le 443 **déjà configurée**, inutile de la refaire ;
-- `exposedbydefault=false` : seuls les conteneurs portant `traefik.enable=true` sont
-  publiés, ce qui laisse base, cache et stockage hors d'atteinte.
+Vous savez que vous êtes sur le serveur quand la ligne commence par `root@srv...`.
 
-`TRAEFIK_RESEAU` désigne le réseau du projet, non celui de Traefik : Compose le nomme
-d'après le dossier, donc `decorek_default` si le dépôt est cloné dans `decorek`. Le
-vérifier après le premier démarrage avec `docker network ls`.
+---
 
-## 2. Préparer le fichier .env
+## 2. Savoir se déplacer
 
-Copier `.env.example` en `.env`, puis renseigner :
+Quatre commandes suffisent.
 
-- `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `MINIO_ROOT_PASSWORD` — mots de passe longs et
-  distincts, jamais ceux du développement ;
-- `AUTH_SECRET` — `openssl rand -base64 32` ;
-- `SITE_DOMAINE` — `deco-rek.com` ;
-- les variables `SMTP_*` du fournisseur d'e-mails.
+| Commande | Ce qu'elle fait |
+|---|---|
+| `pwd` | Affiche où vous êtes |
+| `ls` | Liste les fichiers du dossier |
+| `ls -la` | Liste **tout**, y compris les fichiers cachés comme `.env` |
+| `cd /opt/decorek` | Va dans le dossier du projet |
 
-Sans ces trois derniers, une cliente ne peut pas confirmer son adresse : son compte
-reste inactivable.
+Les fichiers dont le nom commence par un point sont cachés : `ls` seul ne les montre
+pas. C'est le cas de `.env`, qui contient vos mots de passe. Utilisez `ls -la` pour le
+voir.
 
-## 3. Déployer
+Placez-vous dans le projet, et restez-y pour toute la suite :
 
 ```sh
-git pull
+cd /opt/decorek
+pwd
+```
+
+La dernière commande doit répondre exactement `/opt/decorek`.
+
+---
+
+## 3. Ouvrir et modifier un fichier
+
+L'éditeur le plus simple s'appelle **nano**. Pour ouvrir un fichier :
+
+```sh
+nano .env
+```
+
+Le fichier s'affiche. Vous vous déplacez avec les **flèches du clavier** — la souris ne
+fonctionne pas. Vous écrivez normalement.
+
+En bas de l'écran, une liste de raccourcis. Le `^` signifie la touche **Ctrl**.
+
+| Raccourci | Effet |
+|---|---|
+| `Ctrl` + `O` puis `Entrée` | **Enregistrer** (O comme « Output ») |
+| `Ctrl` + `X` | **Quitter** |
+| `Ctrl` + `K` | Supprimer la ligne entière |
+| `Ctrl` + `W` | Chercher un mot |
+
+**L'ordre à retenir : `Ctrl+O`, `Entrée`, puis `Ctrl+X`.** Si vous faites `Ctrl+X`
+sans avoir enregistré, nano demande `Save modified buffer?` — tapez `y` puis `Entrée`.
+
+Pour seulement lire un fichier sans risquer de le modifier :
+
+```sh
+cat .env
+```
+
+---
+
+## 4. Remplir le fichier .env
+
+Ce fichier contient les mots de passe et les réglages. Il n'est **jamais** envoyé sur
+GitHub : il n'existe que sur ce serveur.
+
+### Générer les mots de passe
+
+Ne réutilisez pas ceux du développement : ils sont visibles dans le dépôt. Générez-en
+de nouveaux, un par ligne :
+
+```sh
+openssl rand -base64 32
+```
+
+Lancez cette commande **cinq fois** et gardez les cinq résultats sous la main — un pour
+chaque mot de passe ci-dessous. Vous pouvez les copier-coller depuis le terminal.
+
+### Ouvrir le fichier
+
+```sh
+nano .env
+```
+
+### Les valeurs à renseigner
+
+Cherchez chaque ligne et remplacez ce qui suit le signe `=`. **Pas d'espace autour du
+`=`, pas de guillemets.**
+
+```
+POSTGRES_PASSWORD=collez-ici-le-premier-mot-de-passe
+REDIS_PASSWORD=collez-ici-le-deuxième
+MINIO_ROOT_PASSWORD=collez-ici-le-troisième
+AUTH_SECRET=collez-ici-le-quatrième
+```
+
+Puis la partie production :
+
+```
+SITE_DOMAINE=deco-rek.com
+TRAEFIK_RESEAU=decorek_default
+TRAEFIK_ENTREE=websecure
+TRAEFIK_RESOLVEUR=letsencrypt
+```
+
+Ces trois derniers ont été relevés sur votre serveur : ils sont corrects, ne les
+changez pas.
+
+### Les e-mails
+
+Sans cette partie, une cliente qui crée un compte ne recevra jamais le lien de
+confirmation, et son compte restera inutilisable. **Retirez le `#` devant chaque
+ligne** et complétez :
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=votre.adresse@gmail.com
+SMTP_PASSWORD=le-mot-de-passe-application-de-16-caracteres
+MAIL_FROM=Deco'Rek <votre.adresse@gmail.com>
+```
+
+Le mot de passe d'application n'est **pas** celui de votre compte Google. Il se génère
+sur <https://myaccount.google.com/apppasswords>, après avoir activé la validation en
+deux étapes. Google affiche 16 lettres en quatre groupes : saisissez-les **sans les
+espaces**.
+
+Enregistrez : `Ctrl+O`, `Entrée`, `Ctrl+X`.
+
+### Relire ce qui a été enregistré
+
+```sh
+grep -v '^#' .env | grep -v '^$'
+```
+
+Cette commande affiche les lignes utiles, sans les commentaires. Vérifiez qu'aucune
+ligne importante ne finit par `=` tout seul.
+
+---
+
+## 5. Vérifier le nom de domaine
+
+Le certificat HTTPS ne peut être obtenu que si `deco-rek.com` pointe déjà sur votre
+serveur.
+
+Connaître l'adresse du serveur :
+
+```sh
+curl -s ifconfig.me
+```
+
+Vérifier où pointe le domaine :
+
+```sh
+dig +short deco-rek.com
+```
+
+**Les deux commandes doivent afficher la même adresse.** Si la seconde ne répond rien,
+le domaine n'est pas encore configuré : allez dans la zone DNS de votre registraire et
+créez un enregistrement de type **A** pointant `deco-rek.com` vers l'adresse du VPS.
+Comptez de quelques minutes à quelques heures pour que ce soit pris en compte.
+
+Ne passez pas à la suite tant que ces deux adresses diffèrent : Let's Encrypt refuserait
+de délivrer le certificat, et le site s'afficherait avec un avertissement de sécurité.
+
+---
+
+## 6. Démarrer le site
+
+```sh
+cd /opt/decorek
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api npm run db:deploy
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api npm run db:seed
 ```
 
-L'amorçage n'écrase pas les articles existants et ne réattribue aucune référence : il
-peut être rejoué sans risque.
+Décomposons :
 
-## 4. Créer le compte d'administration
+- `-f docker-compose.yml -f docker-compose.prod.yml` : les deux fichiers de
+  configuration, le second complétant le premier pour la production ;
+- `up` : démarre ;
+- `-d` : en arrière-plan, pour que vous récupériez la main ;
+- `--build` : construit les images à partir du code.
+
+**La première fois, comptez cinq à dix minutes.** Beaucoup de texte défile, c'est
+normal. Ensuite, vérifiez :
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api \
-  npm run db:admin -- votre.adresse@exemple.com
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ```
 
-Le compte doit exister — créé depuis le site — avant d'être promu.
+Vous devez voir six lignes — `db`, `cache`, `storage`, `storage-init`, `api`, `site` —
+et la colonne `STATUS` doit indiquer `Up` avec `(healthy)`.
 
-## 5. Vérifier
+Si un service affiche `Restarting` ou `Exited`, allez au chapitre 12.
+
+---
+
+## 7. Préparer la base de données
+
+La base démarre vide. Deux commandes la mettent en état.
+
+Ces commandes passent par un service dédié, `outils`. `run --rm` le démarre le temps
+d'une commande puis le supprime : il ne tourne pas en permanence.
+
+Pour éviter de retaper la longue ligne à chaque fois, créez un raccourci — valable
+jusqu'à la fermeture de votre session :
 
 ```sh
-curl -sI https://deco-rek.com | head -3          # 200 et certificat valide
-curl -s https://deco-rek.com/sitemap.xml | head  # le plan du site répond
+alias dc="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+```
+
+Vous pourrez alors écrire `dc ps` au lieu de la commande entière. Les exemples qui
+suivent donnent les deux formes.
+
+### Créer les tables
+
+```sh
+dc --profile outils run --rm outils npm run db:deploy
+```
+
+Sans le raccourci :
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  --profile outils run --rm outils npm run db:deploy
+```
+
+Vous devez lire `All migrations have been successfully applied.` — ou
+`No pending migrations to apply.` si la base est déjà à jour, ce qui est tout aussi bon.
+
+### Installer le catalogue de départ
+
+```sh
+dc --profile outils run --rm outils npm run db:seed
+```
+
+Vous devez lire `Données de démonstration en place.`
+
+Cette commande installe les huit articles de démonstration, les catégories, les zones
+de livraison et les textes du site. Elle peut être relancée sans danger : elle n'efface
+aucun article que vous auriez ajouté et ne change aucune référence déjà attribuée.
+
+---
+
+## 8. Créer votre compte d'administration
+
+**L'ordre compte.** Le compte doit d'abord exister avant d'être promu.
+
+1. Ouvrez <https://deco-rek.com/compte> dans votre navigateur
+2. Cliquez sur **Créer un compte**, avec l'adresse que vous utiliserez pour gérer la
+   boutique
+3. Ouvrez l'e-mail reçu et cliquez sur le lien de confirmation
+4. Puis, sur le serveur :
+
+```sh
+dc --profile outils run --rm outils npm run db:admin -- votre.adresse@exemple.com
+```
+
+Remplacez l'adresse par la vôtre. Vous devez lire
+`votre.adresse@exemple.com est désormais administrateur.`
+
+Si le message dit que le compte est introuvable, c'est que l'étape 2 n'a pas été faite :
+le compte doit exister avant d'être promu.
+
+Rechargez ensuite <https://deco-rek.com/compte> : un bouton **Back-office** doit
+apparaître.
+
+Si vous n'avez pas reçu l'e-mail, c'est que la configuration SMTP est incomplète.
+Reprenez le chapitre 4, puis relancez :
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d api
+```
+
+---
+
+## 9. Vérifier que tout marche
+
+### Le site répond en HTTPS
+
+```sh
+curl -sI https://deco-rek.com | head -3
+```
+
+Vous devez voir `HTTP/2 200`. Un message parlant de certificat signifie que le
+certificat n'a pas encore été délivré — revoyez le chapitre 5.
+
+### Les pages partent complètes
+
+```sh
 curl -s https://deco-rek.com/produit/chaise-royale-doree | grep -c "Chaise royale"
 ```
 
-La dernière commande doit renvoyer un nombre supérieur à zéro : elle prouve que la page
-part complète, ce dont dépendent les aperçus WhatsApp et les moteurs de recherche.
+Le résultat doit être **supérieur à zéro**. C'est la vérification la plus importante du
+lot : elle prouve que la page contient déjà le nom de l'article avant tout affichage.
+C'est ce dont dépendent l'aperçu WhatsApp — la photo et le titre quand on partage un
+lien — et les moteurs de recherche.
 
-Depuis le site, vérifier ensuite que les images s'affichent — elles passent par `/media`
-— et renseigner les numéros Wave et Orange Money dans le back-office, onglet Contenu.
+Si le résultat est `0`, le site n'arrive pas à joindre l'API. Voyez le chapitre 12.
 
-## Ce qui n'est pas exposé
+### Le plan du site
 
-Base de données, cache, stockage et messagerie n'ouvrent aucun port : ils ne se
-joignent que par le réseau interne de Docker. Les ports du poste de développement
-vivent dans `docker-compose.dev.yml`, qui n'est jamais utilisé en production.
+```sh
+curl -s https://deco-rek.com/sitemap.xml | head -5
+```
 
-Le stockage est servi sous `/media` plutôt que par sa propre adresse : sa console
-d'administration reste ainsi hors d'atteinte.
+Vous devez voir du XML mentionnant `deco-rek.com`.
+
+### Dans le navigateur
+
+Ouvrez <https://deco-rek.com> et vérifiez :
+
+- le cadenas s'affiche dans la barre d'adresse ;
+- les photos des articles apparaissent — elles passent par `/media` ;
+- une fiche produit s'ouvre et affiche ses images.
+
+---
+
+## 10. Les réglages à faire dans le back-office
+
+Rendez-vous sur <https://deco-rek.com/admin>, onglet **Contenu**.
+
+**À changer impérativement** — ce sont aujourd'hui des numéros de démonstration qui ne
+mènent nulle part :
+
+- **Numéro Wave** : celui où les clientes envoient leur paiement
+- **Numéro Orange Money** : idem
+- **WhatsApp** : le numéro qui recevra les reçus de paiement
+
+Vérifiez aussi le téléphone, l'adresse e-mail, l'adresse postale, et les liens des
+réseaux sociaux — un champ laissé vide retire simplement l'icône du pied de page.
+
+Passez ensuite une commande de test complète, de bout en bout, pour vérifier que le
+bouton WhatsApp ouvre bien une conversation vers votre numéro.
+
+---
+
+## 11. Mettre à jour le site plus tard
+
+Quand du nouveau code est prêt :
+
+```sh
+cd /opt/decorek
+alias dc="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+git pull
+dc up -d --build
+dc --profile outils run --rm outils npm run db:deploy
+```
+
+La dernière ligne applique les éventuelles évolutions de la base. Elle ne fait rien
+s'il n'y en a pas — la lancer systématiquement ne coûte rien et évite un oubli.
+
+Vos données ne sont jamais touchées par une mise à jour : elles vivent dans des volumes
+Docker, séparés du code.
+
+---
+
+## 12. Quand ça ne marche pas
+
+### Lire ce que disent les services
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 50 api
+```
+
+Remplacez `api` par le service qui pose problème : `site`, `db`, `storage`. Cherchez
+les lignes contenant `error`.
+
+Pour suivre en direct pendant que vous rechargez la page :
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f site
+```
+
+`Ctrl` + `C` pour arrêter de suivre — cela n'arrête pas le service.
+
+### Le site affiche « 404 page not found »
+
+C'est Traefik qui répond : il ne trouve aucune règle pour ce domaine. Vérifiez que
+`SITE_DOMAINE` dans `.env` correspond exactement au domaine tapé, puis relancez :
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Vérifiez aussi le nom du réseau :
+
+```sh
+docker network ls | grep decorek
+```
+
+Le nom affiché doit être identique à `TRAEFIK_RESEAU` dans `.env`.
+
+### Le certificat n'est pas valide
+
+Let's Encrypt valide en interrogeant le port 80. Vérifiez que le domaine pointe bien
+sur le serveur (chapitre 5) et que le port 80 n'est pas bloqué :
+
+```sh
+curl -sI http://deco-rek.com | head -3
+```
+
+Le certificat peut mettre une minute à être délivré après le premier démarrage.
+
+### Un service redémarre en boucle
+
+Presque toujours un `.env` incomplet. Regardez ses journaux : le message dit
+généralement quelle variable manque.
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 30 api
+```
+
+### Tout redémarrer proprement
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml restart
+```
+
+**À ne pas confondre** avec la commande suivante, qui supprime les conteneurs. Elle est
+sans danger pour vos données — celles-ci sont dans des volumes — mais ne la lancez
+qu'en connaissance de cause :
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+```
+
+N'ajoutez **jamais** `-v` à cette commande : cette option effacerait la base de
+données, les comptes et les images de la boutique.
+
+---
+
+## Ce qui n'est pas exposé sur Internet
+
+Seul le site est accessible de l'extérieur. La base de données, le cache et le stockage
+n'ouvrent aucun port : ils ne se joignent que depuis l'intérieur du serveur.
+
+Les images sont servies sous `/media` plutôt que par l'adresse du stockage, ce qui garde
+sa console d'administration hors d'atteinte.
