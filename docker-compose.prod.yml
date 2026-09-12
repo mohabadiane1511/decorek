@@ -93,6 +93,21 @@ services:
       traefik.http.middlewares.decorek-media-chemin.replacepathregex.regex: ^/media/(.*)
       traefik.http.middlewares.decorek-media-chemin.replacepathregex.replacement: /${MINIO_BUCKET:-decorek-media}/$$1
 
+      # Envoi des photos depuis le back-office. Le navigateur dépose le fichier
+      # directement dans le stockage, à l'adresse que l'API a signée — et cette
+      # signature couvre le chemin exact, nom du seau compris. On ne peut donc pas le
+      # faire passer par /media et le réécrire : MinIO rejetterait la signature. Sans
+      # cette route, l'envoi tombait sur le site et échouait en 404, alors que l'API
+      # avait bien répondu.
+      #
+      # Limitée aux envois (PUT) : c'est tout ce dont le back-office a besoin, et le
+      # stockage n'accepte de toute façon aucune écriture sans signature valide.
+      traefik.http.routers.decorek-televersement.rule: Host(`${SITE_DOMAINE:-deco-rek.com}`) && Method(`PUT`) && PathPrefix(`/${MINIO_BUCKET:-decorek-media}/`)
+      traefik.http.routers.decorek-televersement.priority: "10"
+      traefik.http.routers.decorek-televersement.entrypoints: ${TRAEFIK_ENTREE:-websecure}
+      traefik.http.routers.decorek-televersement.tls.certresolver: ${TRAEFIK_RESOLVEUR:-letsencrypt}
+      traefik.http.routers.decorek-televersement.service: decorek-media
+
   # La messagerie de développement n'a rien à faire en production : les e-mails partent
   # par le fournisseur configuré dans .env.
   mail:
