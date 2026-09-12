@@ -42,7 +42,11 @@ export function GalerieProduit({
   };
 
   return (
-    <div>
+    // `min-w-0` : la galerie est une case de grille, et une case de grille refuse par
+    // défaut d'être plus étroite que son contenu. Avec plusieurs vignettes, la rangée
+    // qui devait défiler élargissait donc toute la page au lieu de défiler — l'écran
+    // débordait sur téléphone, barre de navigation comprise.
+    <div className="min-w-0">
       <div className="relative mx-auto aspect-[4/5] w-full max-w-[560px] overflow-hidden bg-sand">
         {courante ? (
           <img
