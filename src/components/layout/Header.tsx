@@ -22,7 +22,8 @@ export function Header() {
     <header className="sticky top-0 z-40 bg-background">
       {barVisible && (
         <div className="relative bg-foreground px-10 py-2.5 text-center text-background">
-          <span className="label-mono">
+          {/* Plus petit sur téléphone : tient sur une ligne même à 360 px. */}
+          <span className="label-mono max-sm:text-xs">
             Wave &amp; Orange Money · Livraison Dakar &amp; régions
           </span>
           <button
@@ -104,7 +105,7 @@ export function Header() {
             >
               <Heart className="h-5 w-5" strokeWidth={1.4} />
               {favoris.length > 0 && (
-                <span className="absolute top-1 right-0.5 grid h-4 min-w-4 place-items-center bg-foreground px-1 font-mono text-[10px] text-background">
+                <span className="absolute top-1 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-foreground px-1 text-[10px] font-bold tabular-nums text-background">
                   {favoris.length}
                 </span>
               )}
@@ -116,7 +117,7 @@ export function Header() {
             >
               <ShoppingBag className="h-5 w-5" strokeWidth={1.4} />
               {cartCount > 0 && (
-                <span className="absolute top-1 right-0.5 grid h-4 min-w-4 place-items-center bg-orange-brand px-1 font-mono text-[10px] text-white">
+                <span className="absolute top-1 right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-orange-brand px-1 text-[10px] text-white">
                   {cartCount}
                 </span>
               )}

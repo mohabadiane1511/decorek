@@ -139,7 +139,9 @@ function ProductPage() {
             <p className="label-mono text-muted-foreground">{category?.name ?? "Deco'Rek"}</p>
             <h1 className="title-lg mt-3">{product.name}</h1>
             <p className="mt-4 flex items-baseline gap-3">
-              <span className="font-mono text-2xl">{formatFcfa(product.price)}</span>
+              <span className="text-3xl font-extrabold tracking-tight tabular-nums">
+                {formatFcfa(product.price)}
+              </span>
               {product.oldPrice && (
                 <span className="text-sm text-muted-foreground line-through">
                   {formatFcfa(product.oldPrice)}
@@ -159,7 +161,7 @@ function ProductPage() {
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <div className="flex items-center border border-border">
+              <div className="flex items-center overflow-hidden rounded-full border border-border">
                 <button
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
                   className="grid h-11 w-11 place-items-center hover:bg-muted"
@@ -216,7 +218,7 @@ function ProductPage() {
           <section className="mt-20">
             <p className="section-index">Sélection</p>
             <h2 className="title-lg mt-4">Vous aimerez aussi.</h2>
-            <div className="mt-10 grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-4">
+            <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-12 sm:gap-x-6 lg:grid-cols-4">
               {related.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

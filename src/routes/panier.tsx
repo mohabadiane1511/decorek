@@ -64,7 +64,7 @@ function Panier() {
                 </Link>
                 <p className="text-sm text-muted-foreground">{formatFcfa(product!.price)}</p>
                 <div className="mt-3 flex items-center gap-3">
-                  <div className="flex items-center border border-border">
+                  <div className="flex items-center overflow-hidden rounded-full border border-border">
                     <button
                       className="grid h-9 w-9 place-items-center hover:bg-muted"
                       aria-label="Diminuer"

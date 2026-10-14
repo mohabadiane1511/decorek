@@ -125,11 +125,11 @@ function ReglerCommande({ order }: { order: Order }) {
           <LigneCopiable libelle="Numéro à créditer" valeur={numero} />
           <div className="flex flex-wrap justify-between gap-2">
             <dt className="text-muted-foreground">Montant exact</dt>
-            <dd className="font-mono text-base">{formatFcfa(order.total)}</dd>
+            <dd className="text-base font-bold tabular-nums">{formatFcfa(order.total)}</dd>
           </div>
           <div className="flex flex-wrap justify-between gap-2">
             <dt className="text-muted-foreground">À indiquer en libellé</dt>
-            <dd className="font-mono text-base">{order.number}</dd>
+            <dd className="text-base font-semibold tabular-nums">{order.number}</dd>
           </div>
         </dl>
       ) : (
@@ -195,7 +195,7 @@ function LigneCopiable({ libelle, valeur }: { libelle: string; valeur: string })
     <div className="flex flex-wrap items-center justify-between gap-2">
       <dt className="text-muted-foreground">{libelle}</dt>
       <dd className="flex items-center gap-2">
-        <span className="font-mono text-base">{valeur}</span>
+        <span className="text-base font-semibold tabular-nums">{valeur}</span>
         <button
           type="button"
           onClick={() => void copier()}

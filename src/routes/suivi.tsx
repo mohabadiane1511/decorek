@@ -94,7 +94,7 @@ function Suivi() {
         {order && (
           <div className="mt-10 border border-border p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-mono text-sm tracking-wider">{order.number}</h2>
+              <h2 className="text-sm font-semibold tabular-nums">{order.number}</h2>
               <span className="text-sm text-muted-foreground">{formatDate(order.createdAt)}</span>
             </div>
             <p className="mt-1 text-sm">Statut : {statusLabels[order.status]}</p>

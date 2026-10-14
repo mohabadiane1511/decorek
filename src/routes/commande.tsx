@@ -387,7 +387,7 @@ function Commande() {
           </ul>
 
           <div className="mt-5 border-t border-border pt-5">
-            <Label htmlFor="promo" className="text-xs tracking-wide uppercase">
+            <Label htmlFor="promo" className="text-sm font-medium">
               Code promo
             </Label>
             <div className="mt-2 flex gap-2">

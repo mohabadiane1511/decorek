@@ -281,7 +281,7 @@ function Admin() {
 function Card({ title, value, hint }: { title: string; value: string; hint?: string }) {
   return (
     <div className="border border-border bg-background p-5">
-      <p className="text-xs tracking-wide text-muted-foreground uppercase">{title}</p>
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
       <p className="mt-2 title-lg">{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
     </div>
@@ -504,7 +504,7 @@ function Orders() {
           <article key={o.id} className="border border-border bg-background p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
               <div>
-                <h3 className="font-mono text-sm tracking-wider">{o.number}</h3>
+                <h3 className="text-sm font-semibold tabular-nums">{o.number}</h3>
                 <p className="text-sm text-muted-foreground">
                   {o.customer.name} · {o.customer.phone} · {formatDate(o.createdAt)}
                 </p>
@@ -807,7 +807,7 @@ function Products() {
             />
             {draft.images.length > 0 && (
               <>
-                <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                <p className="mt-3 text-xs text-muted-foreground">
                   Glissez pour réorganiser — la 1re image est la couverture
                 </p>
                 <div className="mt-2 flex flex-wrap gap-3">
@@ -837,7 +837,7 @@ function Products() {
                         className={`h-16 w-16 object-cover ${i === 0 ? "border-2 border-foreground" : "border border-border"}`}
                       />
                       {i === 0 && (
-                        <span className="absolute inset-x-0 bottom-0 bg-foreground/85 py-0.5 text-center font-mono text-[9px] uppercase tracking-wider text-background">
+                        <span className="absolute inset-x-0 bottom-0 bg-foreground/85 py-0.5 text-center text-[10px] font-semibold text-background">
                           Couverture
                         </span>
                       )}
@@ -902,7 +902,7 @@ function Products() {
           <tbody className="divide-y divide-border">
             {products.map((p) => (
               <tr key={p.id}>
-                <td className="px-4 py-3 font-mono text-xs whitespace-nowrap text-muted-foreground">
+                <td className="px-4 py-3 text-xs whitespace-nowrap tabular-nums text-muted-foreground">
                   {p.sku ?? "—"}
                 </td>
                 <td className="px-4 py-3">
@@ -1650,7 +1650,7 @@ function AccesRefuse() {
         <p className="label-mono text-muted-foreground">Deco'Rek — Back-office</p>
         <h1 className="title-lg mt-3">Accès refusé.</h1>
         <p className="mt-4 text-sm text-muted-foreground">
-          Le compte <span className="font-mono">{store.user?.email}</span> n'a pas les droits
+          Le compte <span className="font-semibold">{store.user?.email}</span> n'a pas les droits
           d'administration. Contactez un responsable pour qu'il vous les accorde.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-2">

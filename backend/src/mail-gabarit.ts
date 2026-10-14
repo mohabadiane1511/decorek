@@ -18,7 +18,13 @@ const ORANGE = "#F07022";
 const SABLE = "#F8F8F8";
 const BORDURE = "#E5E5E5";
 const GRIS = "#767676";
-const PILE = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+// La police du site quand la messagerie sait la charger (Apple Mail, iOS) ; Gmail et
+// Outlook ignorent les polices web et retombent sur Helvetica ou Arial.
+const PILE = "'Plus Jakarta Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const POLICE_WEB =
+  "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap";
+// Petits intitulés : en minuscules, comme sur le site.
+const INTITULE = `font-family:${PILE};font-size:13px;font-weight:600`;
 
 export type Ligne = { libelle: string; valeur: string; accentue?: boolean };
 export type Article = { nom: string; quantite: number; prix: string };
@@ -75,7 +81,7 @@ function versHtml(m: Message): string {
 
   const articles = m.articles?.length
     ? bloc(`
-      <p style="font-family:${PILE};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${GRIS};margin:32px 0 12px">Votre commande</p>
+      <p style="${INTITULE};color:${GRIS};margin:32px 0 12px">Votre commande</p>
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse">
         ${m.articles
           .map(
@@ -93,7 +99,7 @@ function versHtml(m: Message): string {
     : "";
 
   const lignes = (titre: string, valeurs: Ligne[]) => `
-      <p style="font-family:${PILE};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${GRIS};margin:32px 0 12px">${titre}</p>
+      <p style="${INTITULE};color:${GRIS};margin:32px 0 12px">${titre}</p>
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse">
         ${valeurs
           .map(
@@ -106,18 +112,18 @@ function versHtml(m: Message): string {
       </table>`;
 
   return `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${echapper(m.titre)}</title></head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${echapper(m.titre)}</title><link rel="stylesheet" href="${POLICE_WEB}"></head>
 <body style="margin:0;padding:0;background:${SABLE}">
   <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:${SABLE};padding:32px 16px">
     <tr><td align="center">
       <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background:#FFFFFF;border:1px solid ${BORDURE}">
 
         <tr><td style="background:${ANTHRACITE};padding:24px 32px">
-          <p style="font-family:${PILE};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#FFFFFF;margin:0">Deco'Rek</p>
+          <p style="font-family:${PILE};font-size:15px;font-weight:700;color:#FFFFFF;margin:0">Deco'Rek</p>
         </td></tr>
 
         ${bloc(`
-          <p style="font-family:${PILE};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${ORANGE};margin:32px 0 8px">${echapper(m.surtitre)}</p>
+          <p style="${INTITULE};color:${ORANGE};margin:32px 0 8px">${echapper(m.surtitre)}</p>
           <h1 style="font-family:${PILE};font-size:24px;font-weight:700;color:${ANTHRACITE};margin:0 0 16px;line-height:1.25">${echapper(m.titre)}</h1>
           <p style="font-family:${PILE};font-size:15px;line-height:1.65;color:${ANTHRACITE};margin:0">${echapper(m.intro)}</p>`)}
 
@@ -129,8 +135,8 @@ function versHtml(m: Message): string {
           m.lien
             ? bloc(`
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin:32px 0 0">
-            <tr><td style="background:${ORANGE}">
-              <a href="${echapper(m.lien.url)}" style="display:inline-block;padding:14px 28px;font-family:${PILE};font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#FFFFFF;text-decoration:none">${echapper(m.lien.libelle)}</a>
+            <tr><td style="background:${ORANGE};border-radius:999px">
+              <a href="${echapper(m.lien.url)}" style="display:inline-block;padding:13px 28px;border-radius:999px;font-family:${PILE};font-size:15px;font-weight:700;color:#FFFFFF;text-decoration:none">${echapper(m.lien.libelle)}</a>
             </td></tr>
           </table>
           <p style="font-family:${PILE};font-size:12px;line-height:1.6;color:${GRIS};margin:16px 0 0">
@@ -145,7 +151,7 @@ function versHtml(m: Message): string {
         <tr><td style="padding:32px"><div style="border-top:1px solid ${BORDURE}"></div></td></tr>
 
         <tr><td style="padding:0 32px 32px">
-          <p style="font-family:${PILE};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:${GRIS};margin:0 0 8px">Deco'Rek — Dakar, Sénégal</p>
+          <p style="${INTITULE};color:${GRIS};margin:0 0 8px">Deco'Rek — Dakar, Sénégal</p>
           <p style="font-family:${PILE};font-size:12px;line-height:1.6;color:${GRIS};margin:0">
             Vous recevez ce message suite à une action effectuée avec votre adresse sur deco-rek.com.
             Si vous n'en êtes pas à l'origine, ignorez simplement cet e-mail.

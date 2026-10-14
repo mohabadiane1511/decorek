@@ -5,9 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --font-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  /* Plus Jakarta Sans partout (option B, choisie par la cliente le 14/10/2026) : titres
+   * en gras, texte simple, plus de police machine à écrire pour les étiquettes. */
+  --font-display: "Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Helvetica Neue", Arial, sans-serif;
+  /* Réservée aux graphiques du back-office ; aucune police à télécharger. */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -143,10 +146,10 @@
   h3,
   .font-display {
     font-family: var(--font-display);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    text-transform: uppercase;
-    line-height: 0.95;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    text-wrap: balance;
   }
 }
 
@@ -194,11 +197,14 @@
   }
 }
 
+/*
+ * Petites étiquettes : badges, intitulés, index. Le nom est resté celui de l'ancienne
+ * police machine à écrire, pour ne pas retoucher chaque composant qui l'emploie.
+ */
 @utility label-mono {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
   line-height: 1.4;
 }
 
@@ -215,46 +221,43 @@
  * badges, index et intitulés de tout le site, où la petite taille est voulue.
  */
 @utility nav-lien {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
   line-height: 1.4;
 }
 
 @utility section-index {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--muted-foreground);
 }
 
 @utility vlabel {
   writing-mode: vertical-rl;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 @utility title-xl {
   font-family: var(--font-display);
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: -0.035em;
-  line-height: 0.92;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
   font-size: clamp(2.25rem, 7vw, 5rem);
+  text-wrap: balance;
 }
 
 @utility title-lg {
   font-family: var(--font-display);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: -0.03em;
-  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
   font-size: clamp(1.75rem, 4.5vw, 3rem);
+  text-wrap: balance;
 }
 
 @utility btn-square {
@@ -262,12 +265,15 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  border: 1px solid var(--foreground);
-  padding: 0.9rem 1.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  border: 1.5px solid var(--foreground);
+  /* Bouton arrondi : le nom « square » date de l'ancien style, gardé pour ne pas
+   * retoucher les 47 boutons qui l'emploient. */
+  border-radius: 999px;
+  padding: 0.75rem 1.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.2;
   transition:
     background-color 0.25s ease,
     color 0.25s ease;
@@ -301,8 +307,7 @@
   gap: 0.5rem;
   border-bottom: 1px solid currentColor;
   padding-bottom: 0.25rem;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
 }

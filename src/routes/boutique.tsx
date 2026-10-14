@@ -126,7 +126,7 @@ function Boutique() {
           <Link
             to="/boutique"
             search={(prev: Search) => ({ ...prev, categorie: undefined, page: undefined })}
-            className={`label-mono shrink-0 border px-4 py-3 whitespace-nowrap transition-colors ${
+            className={`label-mono shrink-0 rounded-full border px-4 py-2.5 whitespace-nowrap transition-colors ${
               !activeCategory
                 ? "border-foreground bg-foreground text-background"
                 : "border-border hover:bg-muted"
@@ -139,7 +139,7 @@ function Boutique() {
               key={c.id}
               to="/boutique"
               search={(prev: Search) => ({ ...prev, categorie: c.slug, page: undefined })}
-              className={`label-mono shrink-0 border px-4 py-3 whitespace-nowrap transition-colors ${
+              className={`label-mono shrink-0 rounded-full border px-4 py-2.5 whitespace-nowrap transition-colors ${
                 activeCategory?.id === c.id
                   ? "border-foreground bg-foreground text-background"
                   : "border-border hover:bg-muted"
@@ -215,7 +215,7 @@ function Boutique() {
           </p>
         ) : (
           <div
-            className={`mt-12 grid grid-cols-2 gap-x-6 gap-y-14 transition-opacity md:grid-cols-3 xl:grid-cols-4 ${
+            className={`mt-12 grid grid-cols-2 gap-x-4 gap-y-14 sm:gap-x-6 transition-opacity md:grid-cols-3 xl:grid-cols-4 ${
               isFetching ? "opacity-60" : ""
             }`}
           >

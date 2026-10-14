@@ -37,7 +37,7 @@ export function RecapMontants({
 
       <div className="flex justify-between border-t border-border pt-3 font-medium">
         <dt>{libelleTotal}</dt>
-        <dd className="font-mono">{formatFcfa(order.total)}</dd>
+        <dd className="font-bold tabular-nums">{formatFcfa(order.total)}</dd>
       </div>
     </dl>
   );
@@ -47,7 +47,7 @@ function Ligne({ libelle, valeur }: { libelle: string; valeur: string }) {
   return (
     <div className="flex justify-between text-muted-foreground">
       <dt>{libelle}</dt>
-      <dd className="font-mono">{valeur}</dd>
+      <dd className="tabular-nums">{valeur}</dd>
     </div>
   );
 }

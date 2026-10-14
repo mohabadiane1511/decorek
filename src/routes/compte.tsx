@@ -77,7 +77,7 @@ function EcranAttente({ attente, retour }: { attente: NonNullable<Attente>; reto
       <div className="mx-auto max-w-md px-4 pb-24">
         <div className="border border-border p-6">
           <p className="text-sm leading-relaxed">
-            Message envoyé à <span className="font-mono">{attente.adresse}</span>.
+            Message envoyé à <span className="font-semibold">{attente.adresse}</span>.
           </p>
           <p className="mt-4 text-sm text-muted-foreground">
             Pensez à regarder dans les indésirables si vous ne le voyez pas arriver.
@@ -445,13 +445,13 @@ function EspaceClient({ onDeconnexion }: { onDeconnexion: () => void }) {
               <article key={o.id} className="border border-border bg-background">
                 <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border px-6 py-4">
                   <div>
-                    <h3 className="font-mono text-sm tracking-wider">{o.number}</h3>
+                    <h3 className="text-sm font-semibold tabular-nums">{o.number}</h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatDate(o.createdAt)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-mono">{formatFcfa(o.total)}</p>
+                    <p className="font-semibold tabular-nums">{formatFcfa(o.total)}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {o.paid ? "Paiement vérifié" : "En attente de votre règlement"}
                     </p>

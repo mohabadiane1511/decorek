@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Heart } from "lucide-react";
+import { Heart, ShoppingBag } from "lucide-react";
 import type { Product } from "@/data/types";
 import { formatFcfa } from "@/lib/format";
 import { useStore } from "@/lib/store";
@@ -50,7 +50,7 @@ export function ProductCard({ product }: { product: Product }) {
         aria-label={
           favori ? `Retirer ${product.name} des favoris` : `Ajouter ${product.name} aux favoris`
         }
-        className="absolute top-3 right-3 grid h-9 w-9 place-items-center bg-background/90 transition-colors hover:bg-background"
+        className="absolute top-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-background/90 transition-colors hover:bg-background"
       >
         <Heart
           className={`h-4 w-4 ${favori ? "fill-orange-brand text-orange-brand" : "text-foreground"}`}
@@ -58,28 +58,33 @@ export function ProductCard({ product }: { product: Product }) {
         />
       </button>
 
-      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="label-mono min-w-0 truncate text-muted-foreground">
+      {/* Nom, catégorie, puis prix : l'ordre de la maquette validée par la cliente. Le
+          nom réserve toujours deux lignes, pour que les prix et les boutons d'une même
+          rangée restent alignés quelle que soit la longueur des noms. */}
+      <div className="mt-3 mb-4 flex flex-col gap-1">
+        <Link
+          to="/produit/$slug"
+          params={{ slug: product.slug }}
+          className="line-clamp-2 min-h-[2.5em] text-[0.9375rem] leading-[1.25] font-semibold"
+        >
+          {product.name}
+        </Link>
+        <span className="truncate text-[0.8125rem] text-muted-foreground">
           {category?.name ?? "Deco'Rek"}
         </span>
-        <span className="flex min-w-0 flex-wrap items-baseline gap-2 font-mono text-xs sm:text-sm">
+        <span className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 tabular-nums">
+          <span className="text-base font-bold sm:text-lg">{formatFcfa(product.price)}</span>
           {product.oldPrice && (
             <span className="text-xs text-muted-foreground line-through">
               {formatFcfa(product.oldPrice)}
             </span>
           )}
-          {formatFcfa(product.price)}
         </span>
       </div>
 
-      <Link
-        to="/produit/$slug"
-        params={{ slug: product.slug }}
-        className="mt-1 line-clamp-2 min-h-[2.6em] text-[0.95rem] leading-snug"
-      >
-        {product.name}
-      </Link>
-
+      {/* Sur téléphone, une carte fait ~170 px de large : « Ajouter au panier » y passait
+          sur deux lignes et doublait la hauteur du bouton. Le libellé court reste lu en
+          entier par les lecteurs d'écran, « au panier » n'étant masqué qu'à l'œil. */}
       <button
         type="button"
         disabled={soldOut}
@@ -87,9 +92,16 @@ export function ProductCard({ product }: { product: Product }) {
           addToCart(product.id, 1);
           toast.success("Ajouté au panier", { description: product.name });
         }}
-        className="btn-square btn-solid mt-auto w-full disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+        className="btn-square btn-solid mt-auto w-full whitespace-nowrap max-sm:px-3 max-sm:py-2.5 max-sm:text-sm disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-muted-foreground disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
       >
-        {soldOut ? "Indisponible" : "Ajouter au panier"}
+        {soldOut ? (
+          "Indisponible"
+        ) : (
+          <>
+            <ShoppingBag className="h-4 w-4 sm:hidden" strokeWidth={2} aria-hidden="true" />
+            Ajouter<span className="max-sm:sr-only"> au panier</span>
+          </>
+        )}
       </button>
     </article>
   );

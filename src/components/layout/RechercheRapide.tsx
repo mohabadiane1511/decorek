@@ -167,7 +167,9 @@ export function RechercheRapide({ surFermeture }: { surFermeture: () => void }) 
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{produit.name}</span>
                 <span className="mt-0.5 flex items-baseline gap-2">
-                  <span className="font-mono text-sm">{formatFcfa(produit.price)}</span>
+                  <span className="text-sm font-semibold tabular-nums">
+                    {formatFcfa(produit.price)}
+                  </span>
                   {produit.oldPrice && (
                     <span className="text-xs text-muted-foreground line-through">
                       {formatFcfa(produit.oldPrice)}

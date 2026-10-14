@@ -85,7 +85,7 @@ function Favoris() {
             Les articles que vous aviez mis de côté ne sont plus disponibles.
           </p>
         ) : (
-          <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-14 sm:gap-x-6 md:grid-cols-3 xl:grid-cols-4">
             {data.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

@@ -150,7 +150,7 @@ function Index() {
             Toute la boutique <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
-        <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-4">
+        <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-12 sm:gap-x-6 lg:grid-cols-4">
           {featured.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
@@ -161,7 +161,7 @@ function Index() {
       <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
         <p className="section-index">04 / 05 — Arrivages</p>
         <h2 className="title-lg mt-5">Nouveautés.</h2>
-        <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-4">
+        <div className="mt-12 grid grid-cols-2 gap-x-4 gap-y-12 sm:gap-x-6 lg:grid-cols-4">
           {nouveautes.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
