@@ -47,44 +47,71 @@ services:
       retries: 12
       start_period: 5s
 
+  # Stockage des images, compatible S3. RustFS a remplacé MinIO, qui ne publie plus
+  # d'images Docker. Les variables du .env gardent leur nom MINIO_* pour ne pas avoir
+  # à retoucher les .env existants ; seuls les noms lus par le conteneur changent.
+  # Version figée : une mise à jour du stockage se décide, elle ne doit jamais
+  # arriver par un simple `pull`.
   storage:
-    image: minio/minio:latest
+    image: rustfs/rustfs:1.0.1
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER manquant}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD manquant}
+      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER:?MINIO_ROOT_USER manquant}
+      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD manquant}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      # La console d'administration reste éteinte hors du poste de développement.
+      RUSTFS_CONSOLE_ENABLE: "false"
       # Le navigateur téléverse directement ici, depuis le domaine du site : sans cette
       # autorisation d'origine, chaque envoi serait bloqué. Restreint au site, jamais *.
-      MINIO_API_CORS_ALLOW_ORIGIN: ${AUTH_URL:-http://localhost:8080}
+      RUSTFS_CORS_ALLOWED_ORIGINS: ${AUTH_URL:-http://localhost:8080}
+      # Vide : les journaux partent sur la sortie standard, lisibles par
+      # `docker compose logs storage` comme ceux des autres services.
+      RUSTFS_OBS_LOG_DIRECTORY: ""
     volumes:
-      - storage-data:/data
+      # Volume distinct de celui de MinIO (storage-data), laissé intact sur les serveurs
+      # migrés : c'est lui qui permet de revenir en arrière. Voir scripts/migrer-stockage.sh.
+      - storage-rustfs-data:/data
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
       interval: 5s
       timeout: 5s
       retries: 12
       start_period: 10s
 
-  # Crée le bucket et le rend lisible publiquement (les images produits sont servies
-  # au navigateur via /media). Se termine aussitôt : ce n'est pas un service permanent.
+  # Crée le bucket et rend ses images lisibles par tous (elles sont servies au
+  # navigateur via /media). Se termine aussitôt : ce n'est pas un service permanent.
+  # Relançable sans risque : un bucket existant est conservé tel quel.
   storage-init:
-    image: minio/mc:latest
+    image: amazon/aws-cli:2.24.0
     depends_on:
       storage:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+      # Surchargé par scripts/migrer-stockage.sh pour préparer un stockage temporaire.
+      AWS_ENDPOINT_URL: http://storage:9000
       MINIO_BUCKET: ${MINIO_BUCKET:-decorek-media}
     entrypoint:
       - /bin/sh
       - -c
       - |
         set -e
-        mc alias set local http://storage:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
-        mc mb --ignore-existing "local/$$MINIO_BUCKET"
-        mc anonymous set download "local/$$MINIO_BUCKET"
+        aws s3api head-bucket --bucket "$$MINIO_BUCKET" 2>/dev/null \
+          || aws s3api create-bucket --bucket "$$MINIO_BUCKET" >/dev/null
+        # Lecture des images uniquement. Lister le contenu du bucket reste refusé :
+        # personne n'a à parcourir le catalogue des fichiers depuis /media/.
+        aws s3api put-bucket-policy --bucket "$$MINIO_BUCKET" --policy "{
+          \"Version\": \"2012-10-17\",
+          \"Statement\": [{
+            \"Effect\": \"Allow\",
+            \"Principal\": {\"AWS\": [\"*\"]},
+            \"Action\": [\"s3:GetObject\"],
+            \"Resource\": [\"arn:aws:s3:::$$MINIO_BUCKET/*\"]
+          }]
+        }"
         echo "bucket $$MINIO_BUCKET prêt"
 
   # Boîte aux lettres de développement : capture tous les envois et les affiche dans une
@@ -184,4 +211,4 @@ services:
 volumes:
   db-data:
   cache-data:
-  storage-data:
+  storage-rustfs-data:

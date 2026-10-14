@@ -25,6 +25,11 @@ services:
     ports:
       - "127.0.0.1:${MINIO_PORT:-59000}:9000" # API S3
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-59001}:9001" # console web
+    environment:
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      # L'image autorise toutes les origines par défaut : on s'en tient à la console.
+      RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS: http://localhost:${MINIO_CONSOLE_PORT:-59001}
 
   api:
     ports:

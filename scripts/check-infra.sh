@@ -40,24 +40,29 @@ else
   rate "redis : pas de réponse"
 fi
 
-$COMPOSE exec -T storage mc ready local >/dev/null 2>&1 \
-  && ok "minio : prêt" || rate "minio : non prêt"
+$COMPOSE exec -T storage curl -fsS http://127.0.0.1:9000/health >/dev/null 2>&1 \
+  && ok "stockage : prêt" || rate "stockage : non prêt"
 
 echo "Bucket"
 # Aller-retour complet : un bucket qui existe ne prouve pas qu'on peut y écrire.
-# Passe par le conteneur mc, le seul dont l'alias porte les identifiants — celui de
-# l'image MinIO n'en a pas et ne sert qu'au contrôle de santé.
+# Passe par le conteneur storage-init, le seul qui porte les identifiants.
 if $COMPOSE run --rm --no-deps -T --entrypoint sh storage-init -c "
   set -e
-  mc alias set local http://storage:9000 '$MINIO_ROOT_USER' '$MINIO_ROOT_PASSWORD'
-  echo sonde | mc pipe 'local/$MINIO_BUCKET/.sonde'
-  # L'image mc est minimale : ni grep ni awk, on compare avec le shell.
-  test \"\$(mc cat 'local/$MINIO_BUCKET/.sonde')\" = sonde
-  mc rm 'local/$MINIO_BUCKET/.sonde'
+  echo sonde | aws s3 cp - 's3://$MINIO_BUCKET/.sonde'
+  test \"\$(aws s3 cp 's3://$MINIO_BUCKET/.sonde' -)\" = sonde
+  aws s3 rm 's3://$MINIO_BUCKET/.sonde'
 " >/dev/null 2>&1; then
   ok "bucket ${MINIO_BUCKET} : écriture, lecture et suppression"
 else
   rate "bucket ${MINIO_BUCKET} : aller-retour impossible"
+fi
+
+# Les images sont publiques une à une, mais la liste du bucket ne doit pas l'être.
+if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+      "http://localhost:${MINIO_PORT:-59000}/${MINIO_BUCKET}/")" = "403" ]; then
+  ok "bucket ${MINIO_BUCKET} : liste refusée aux anonymes"
+else
+  rate "bucket ${MINIO_BUCKET} : liste du contenu OUVERTE aux anonymes"
 fi
 
 echo "API"

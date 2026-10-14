@@ -75,6 +75,11 @@ services:
       traefik.http.services.decorek-api.loadbalancer.server.port: "3000"
 
   storage:
+    environment:
+      # Les envois passent par le domaine du site (route decorek-televersement) : même
+      # origine, donc pas de CORS en pratique. Déclarée quand même pour ne jamais
+      # dépendre d'un AUTH_URL absent du .env de production.
+      RUSTFS_CORS_ALLOWED_ORIGINS: https://${SITE_DOMAINE:-deco-rek.com}
     labels:
       traefik.enable: "true"
       traefik.docker.network: ${TRAEFIK_RESEAU:-decorek_default}
@@ -96,7 +101,7 @@ services:
       # Envoi des photos depuis le back-office. Le navigateur dépose le fichier
       # directement dans le stockage, à l'adresse que l'API a signée — et cette
       # signature couvre le chemin exact, nom du seau compris. On ne peut donc pas le
-      # faire passer par /media et le réécrire : MinIO rejetterait la signature. Sans
+      # faire passer par /media et le réécrire : le stockage rejetterait la signature. Sans
       # cette route, l'envoi tombait sur le site et échouait en 404, alors que l'API
       # avait bien répondu.
       #

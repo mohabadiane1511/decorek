@@ -23,6 +23,7 @@ réussi. Sous Linux, le silence est bon signe. C'est quand un texte rouge ou le 
 10. [Les réglages à faire dans le back-office](#10-les-réglages-à-faire-dans-le-back-office)
 11. [Mettre à jour le site plus tard](#11-mettre-à-jour-le-site-plus-tard)
 12. [Quand ça ne marche pas](#12-quand-ça-ne-marche-pas)
+13. [Passer le stockage de MinIO à RustFS (une seule fois)](#13-passer-le-stockage-de-minio-à-rustfs-une-seule-fois)
 
 ---
 
@@ -437,6 +438,10 @@ bouton WhatsApp ouvre bien une conversation vers votre numéro.
 
 ## 11. Mettre à jour le site plus tard
 
+> **Serveur encore sous MinIO ?** La mise à jour qui introduit RustFS se fait une seule
+> fois, avec sa propre procédure : voir le [chapitre 13](#13-passer-le-stockage-de-minio-à-rustfs-une-seule-fois).
+> La commande ci-dessous ferait disparaître les photos du site jusqu'à la copie.
+
 Quand du nouveau code est prêt :
 
 ```sh
@@ -540,6 +545,154 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 N'ajoutez **jamais** `-v` à cette commande : cette option effacerait la base de
 données, les comptes et les images de la boutique.
+
+---
+
+## 13. Passer le stockage de MinIO à RustFS (une seule fois)
+
+Les photos des articles étaient rangées par MinIO, qui ne publie plus de version
+téléchargeable : le jour où le serveur devrait la retélécharger, le stockage ne
+démarrerait plus. RustFS le remplace. Il parle la même langue (S3), si bien que ni le
+code du site, ni la base, ni les adresses `/media/…` des photos ne changent.
+
+Les photos doivent en revanche être **recopiées** : RustFS ne sait pas relire les
+fichiers de MinIO. Le script `scripts/migrer-stockage.sh` s'en charge, par étapes, et
+refuse toute étape lancée dans le désordre. **Il ne supprime jamais rien dans MinIO** :
+en cas de souci, on revient en arrière en quelques minutes.
+
+**Attention : n'utilisez pas la procédure habituelle du chapitre 11 pour cette mise à
+jour.** `dc up -d --build` remplacerait MinIO par un RustFS encore vide : les photos
+disparaîtraient du site (sans être perdues) jusqu'à la fin de la copie.
+
+Prévoyez 20 minutes, dont **5 minutes pendant lesquelles personne n'ajoute ni ne
+supprime de photo** dans le back-office. Le site reste en ligne tout du long.
+
+### Récupérer le nouveau code, sans rien redémarrer
+
+```sh
+cd /opt/decorek
+alias dc="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+git pull
+```
+
+`git pull` ne fait que mettre à jour les fichiers : les services continuent de tourner
+avec MinIO.
+
+### 1. Faire l'inventaire
+
+```sh
+scripts/migrer-stockage.sh inventaire
+```
+
+Vous devez voir le nombre de photos, par exemple `✓ 17 images, 1329 Ko`. Notez-le.
+
+### 2. Sauvegarder
+
+```sh
+scripts/migrer-stockage.sh sauvegarder
+```
+
+Une archive du stockage actuel est créée dans le dossier `sauvegardes/`. Elle ne sert
+qu'en dernier recours : la vraie sécurité, c'est que MinIO reste intact.
+
+### 3. Préparer RustFS
+
+```sh
+scripts/migrer-stockage.sh preparer
+```
+
+Un RustFS provisoire démarre à côté de MinIO, invisible depuis Internet, et reçoit une
+copie des photos. Les deux comptes affichés à la fin doivent être identiques :
+
+```
+✓ MinIO : 17 images, 1329 Ko
+✓ RustFS : 17 images, 1329 Ko
+```
+
+Cette étape peut être relancée sans risque.
+
+### 4. Suspendre les envois de photos, puis finaliser
+
+À partir d'ici, **plus personne ne touche aux photos dans le back-office** jusqu'à la
+fin de l'étape 6. Le reste du site (commandes, comptes, navigation) fonctionne
+normalement.
+
+```sh
+scripts/migrer-stockage.sh finaliser
+```
+
+Le script demande de confirmer en tapant `oui`. Il refait une dernière copie, puis
+relit chaque photo des deux côtés pour vérifier qu'elle est identique à l'octet près.
+Il doit afficher :
+
+```
+0 differences found
+✓ identiques : 17 images, 1329 Ko
+```
+
+S'il signale une différence, il s'arrête : relancez simplement `finaliser`.
+
+### 5. Basculer
+
+```sh
+scripts/migrer-stockage.sh basculer
+```
+
+Seul le stockage redémarre, en quelques secondes. Le script vérifie ensuite tout seul
+que le compte est le bon, que chaque photo est lisible par un visiteur, et que la
+liste des fichiers reste fermée au public. Toutes les lignes doivent être en vert.
+
+### 6. Vérifier à la main, puis reprendre
+
+1. Ouvrez le site et une fiche produit : les photos s'affichent.
+2. Dans le back-office, ajoutez une photo à un article, enregistrez, vérifiez qu'elle
+   s'affiche, puis retirez-la.
+
+Les envois de photos peuvent reprendre. Terminez par la mise à jour habituelle, qui
+ne touche plus au stockage :
+
+```sh
+dc up -d --build
+dc --profile outils run --rm outils npm run db:deploy
+```
+
+### Revenir à MinIO
+
+À faire si les photos ne s'affichent pas après la bascule, ou si l'envoi d'une photo
+échoue :
+
+```sh
+git log --oneline -5 -- docker-compose.yml
+```
+
+Repérez le commit **juste avant** « RustFS » et remettez sa version du fichier :
+
+```sh
+git checkout <ce-commit> -- docker-compose.yml
+dc up -d --no-deps --wait storage
+scripts/migrer-stockage.sh rapatrier
+```
+
+MinIO redémarre sur ses données d'origine. `rapatrier` lui recopie les photos ajoutées
+depuis la bascule, sans rien y supprimer. Le site est revenu à son état d'avant.
+
+Ce retour suppose que l'image de MinIO est toujours sur le serveur : d'ici le ménage
+ci-dessous, ne lancez aucune commande de nettoyage Docker (`docker image prune`,
+`docker system prune`).
+
+Pour retenter plus tard, remettez le fichier à jour avec `git checkout --
+docker-compose.yml`, puis reprenez à l'étape 3.
+
+### Faire le ménage, deux semaines plus tard
+
+Une fois certain que tout va bien, l'ancien volume de MinIO peut être supprimé pour
+libérer de la place. **Ce n'est plus réversible** :
+
+```sh
+docker volume rm decorek_storage-data
+```
+
+Gardez l'archive du dossier `sauvegardes/` quelques mois de plus.
 
 ---
 

@@ -44,3 +44,6 @@ coverage/
 *.njsproj
 *.sln
 *.sw?
+
+# Archives et inventaires de scripts/migrer-stockage.sh
+sauvegardes/

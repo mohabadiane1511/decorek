@@ -55,9 +55,9 @@ export function lireConfigStockage(env: NodeJS.ProcessEnv = process.env): Config
 export function creerClientStockage(config: ConfigStockage): S3Client {
   return new S3Client({
     endpoint: config.endpoint,
-    region: "us-east-1", // MinIO ignore la région, mais le SDK en exige une.
+    region: "us-east-1", // Le stockage ignore la région, mais le SDK en exige une.
     credentials: { accessKeyId: config.accessKey, secretAccessKey: config.secretKey },
-    // MinIO expose les buckets en chemin (/bucket/objet) et non en sous-domaine.
+    // Le stockage expose les buckets en chemin (/bucket/objet) et non en sous-domaine.
     forcePathStyle: true,
   });
 }
